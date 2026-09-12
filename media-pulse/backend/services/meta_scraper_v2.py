@@ -1,0 +1,284 @@
+"""
+Meta Ad Library – Real Scraping (Requests + Playwright Hybrid)
+Priority: 1. Requests to unofficial async endpoint (light) 2. Playwright (JS) 3. Mock fallback
+Handles EG + GCC
+"""
+import asyncio
+import httpx
+import json
+import re
+from datetime import datetime, timedelta
+import random
+from services.estimation import estimate_budget_and_impressions, USD_TO_EGP
+
+def decode_unicode(s: str) -> str:
+    """فك تشفير \u0627 إلى عربي حقيقي – فقط إذا كان يحتوي على \\u"""
+    if not s:
+        return s
+    # فقط فك التشفير إذا كان النص يحتوي على \u escapes
+    if "\\u" not in s:
+        return s
+    try:
+        # استخدم json.loads لفك آمن
+        import json
+        # لف النص بعلامات اقتباس لفك unicode
+        return json.loads(f'"{s}"')
+    except:
+        try:
+            return s.encode('utf-8').decode('unicode_escape')
+        except:
+            return s
+
+# Headers to mimic browser
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
+
+async def scrape_via_requests(brand: str, country: str):
+    """
+    Lightweight requests-based scraper.
+    Only returns results if it finds real ad IDs in HTML (not fake synthetic IDs).
+    Returns [] to allow Playwright GraphQL to handle the search.
+    """
+    results = []
+    try:
+        url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&is_targeted_country=false&media_type=all&q={brand}&search_type=keyword_unordered"
+        async with httpx.AsyncClient(timeout=20, headers=BROWSER_HEADERS, follow_redirects=True) as client:
+            resp = await client.get(url)
+            text = resp.text
+            # Only return [] to let Playwright handle it
+            # The requests approach can't get real ad IDs from Facebook's JS-rendered content
+            print(f"[Scraper Requests] {brand} {country}: HTML length {len(text)} – deferring to Playwright")
+    except Exception as e:
+        print(f"[Scraper Requests] {country} failed: {e}")
+    return []
+
+async def scrape_via_playwright(brand: str, country: str):
+    """Playwright – يعترض GraphQL الحقيقي للحصول على Library ID والـ Creative الحقيقي وروابط مباشرة"""
+    try:
+        from playwright.async_api import async_playwright
+        import json
+        url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&is_targeted_country=false&media_type=all&q={brand}&search_type=keyword_unordered"
+        captured = {"list": []}
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
+            page = await browser.new_page(user_agent=BROWSER_HEADERS["User-Agent"])
+            # اعتراض GraphQL
+            async def handle_response(resp):
+                if "api/graphql" in resp.url:
+                    try:
+                        body = await resp.text()
+                        if "search_results_connection" in body and "ad_archive_id" in body:
+                            captured["list"].append(body)
+                    except: pass
+            page.on("response", handle_response)
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(8000)
+            # Scroll to trigger GraphQL load
+            try:
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(4000)
+                await page.evaluate("window.scrollTo(0, 0)")
+                await page.wait_for_timeout(2000)
+            except: pass
+            # Wait for GraphQL to be captured (up to 10s)
+            for _ in range(20):
+                if captured["list"]:
+                    break
+                await page.wait_for_timeout(500)
+            await page.content()
+            await browser.close()
+
+            # إذا التقطنا GraphQL حقيقي، استخدمه
+            if captured["list"]:
+                try:
+                    # فك NDJSON: الرد قد يحتوي عدة JSON objects متتالية
+                    def iter_jsons(text):
+                        dec = json.JSONDecoder()
+                        idx = 0
+                        n = len(text)
+                        while idx < n:
+                            while idx < n and text[idx] in " \n\r\t":
+                                idx += 1
+                            if idx >= n:
+                                break
+                            try:
+                                obj, end = dec.raw_decode(text, idx)
+                                yield obj
+                                idx = end
+                            except json.JSONDecodeError:
+                                idx += 1
+                    edges = []
+                    seen_ids = set()
+                    for body in captured["list"]:
+                        for obj in iter_jsons(body):
+                            try:
+                                conn = obj["data"]["ad_library_main"]["search_results_connection"]
+                            except (KeyError, TypeError):
+                                continue
+                            for e in conn.get("edges", [])[:10]:
+                                cr_ids = [cr.get("ad_archive_id") for cr in e.get("node", {}).get("collated_results", [])[:3]]
+                                if any(i and i not in seen_ids for i in cr_ids):
+                                    edges.append(e)
+                                    seen_ids.update(i for i in cr_ids if i)
+                    results = []
+                    for edge in edges[:10]:
+                        node = edge.get("node", {})
+                        for cr in node.get("collated_results", [])[:3]:
+                            ad_id = cr.get("ad_archive_id")
+                            if not ad_id:
+                                continue
+                            snap = cr.get("snapshot", {}) or {}
+                            page_name = decode_unicode(snap.get("page_name") or "Unknown")
+                            body_obj = snap.get("body") or {}
+                            creative = decode_unicode(body_obj.get("text") or snap.get("caption") or "")
+                            if not creative:
+                                # جرب cards
+                                cards = snap.get("cards") or []
+                                if cards and cards[0].get("body"):
+                                    creative = decode_unicode(cards[0]["body"].get("text") or "")
+                            if not creative:
+                                creative = f"إعلان {page_name} – {snap.get('link_url') or ''}"
+                            # نوع الكريتيف
+                            ctype = "text"
+                            if snap.get("videos") and len(snap["videos"]) > 0:
+                                ctype = "video"
+                            elif snap.get("images") and len(snap["images"]) > 0:
+                                ctype = "image"
+                            # رابط مباشر للإعلان نفسه (وليس البحث)
+                            snap_url = f"https://www.facebook.com/ads/library/?id={ad_id}"
+                            # تاريخ البداية: غير متوفر في GraphQL، نقدّره
+                            start_dt = datetime.utcnow() - timedelta(days=random.randint(5, 60))
+                            est = estimate_budget_and_impressions(start_dt, None, [country], "meta")
+                            results.append({
+                                "ad_archive_id": str(ad_id),
+                                "library_id": str(ad_id),
+                                "brand_query": brand,
+                                "creative_body": creative[:800],
+                                "creative_type": ctype,
+                                "page_name": page_name,
+                                "page_id": cr.get("page_id"),
+                                "snapshot_url": snap_url,
+                                "start_date": start_dt.isoformat(),
+                                "duration_days": est["duration_days"],
+                                "countries": [country],
+                                "platform": "meta",
+                                "platforms": ["Facebook", "Instagram"],
+                                "categories": snap.get("page_categories") or ["All"],
+                                "status": "active" if cr.get("is_active") else "inactive",
+                                "spend_low": est["spend_low"],
+                                "spend_high": est["spend_high"],
+                                "spend_egp_low": est["spend_egp_low"],
+                                "spend_egp_high": est["spend_egp_high"],
+                                "impressions_low": est["impressions_low"],
+                                "impressions_high": est["impressions_high"],
+                                "audience_low": est["audience_low"],
+                                "audience_high": est["audience_high"],
+                                "is_estimated": True,
+                                "disclaimer": est["disclaimer"] + " (GraphQL – Real ID & Creative)",
+                                "raw_data": {"method": "graphql_real", "page_name": page_name, "ad_archive_id": ad_id, "snapshot": snap},
+                            })
+                    if results:
+                        print(f"[GraphQL] Captured {len(results)} real ads for {brand} {country}")
+                        return results
+                except Exception as e:
+                    print(f"[GraphQL Parse] failed: {e}")
+                    import traceback; traceback.print_exc()
+
+            else:
+                print(f"[GraphQL] No capture for {brand} {country} – returning []")
+    except Exception as e:
+        print(f"[Playwright GraphQL] {country} failed: {e}")
+        import traceback; traceback.print_exc()
+    return []
+
+# Keep old mock for final fallback
+MOCK_ADS = [
+    {"ad_archive_id": "mock_1001", "page_name": "Vodafone Egypt", "creative_body": "عروض الصيف من فودافون - باقة 100 جيجا بسعر 150 جنيه!", "countries": ["EG"], "start_offset_days": 12},
+    {"ad_archive_id": "mock_1002", "page_name": "Vodafone Egypt", "creative_body": "Vodafone Ramadan Offer - Unlimited calls + 50GB", "countries": ["EG", "SA"], "start_offset_days": 45},
+]
+
+def mock_fallback(brand: str, countries: list[str]):
+    results = []
+    brand_lower = brand.lower()
+    for mock in MOCK_ADS:
+        if brand_lower not in mock["page_name"].lower() and brand_lower not in mock["creative_body"].lower():
+            if brand_lower not in ["vodafone", "test", "فودافون", "careem"]:
+                continue
+        if not any(c in mock["countries"] for c in countries):
+            continue
+        start_dt = datetime.utcnow() - timedelta(days=mock["start_offset_days"])
+        est = estimate_budget_and_impressions(start_dt, None, mock["countries"], "meta")
+        results.append({
+            "ad_archive_id": f"{mock['ad_archive_id']}_{brand_lower}",
+            "brand_query": brand,
+            "page_name": mock["page_name"],
+            "creative_body": mock["creative_body"],
+            "snapshot_url": f"https://www.facebook.com/ads/library/?id={mock['ad_archive_id']}",
+            "start_date": start_dt.isoformat(),
+            "duration_days": est["duration_days"],
+            "countries": mock["countries"],
+            "platform": "meta",
+            "status": "active",
+            "spend_low": est["spend_low"],
+            "spend_high": est["spend_high"],
+            "impressions_low": est["impressions_low"],
+            "impressions_high": est["impressions_high"],
+            "is_estimated": True,
+            "disclaimer": est["disclaimer"] + " (Mock Fallback)",
+            "raw_data": mock,
+        })
+    if not results:
+        start_dt = datetime.utcnow() - timedelta(days=random.randint(5, 30))
+        est = estimate_budget_and_impressions(start_dt, None, countries[:2], "meta")
+        results.append({
+            "ad_archive_id": f"mock_dyn_{brand_lower}_{random.randint(1000,9999)}",
+            "brand_query": brand,
+            "page_name": f"{brand} Official",
+            "creative_body": f"إعلان تجريبي لـ {brand} – Demo Fallback",
+            "snapshot_url": "https://www.facebook.com/ads/library/",
+            "start_date": start_dt.isoformat(),
+            "duration_days": est["duration_days"],
+            "countries": countries[:2],
+            "platform": "meta",
+            "status": "active",
+            "spend_low": est["spend_low"],
+            "spend_high": est["spend_high"],
+            "impressions_low": est["impressions_low"],
+            "impressions_high": est["impressions_high"],
+            "is_estimated": True,
+            "disclaimer": est["disclaimer"] + " (Mock)",
+            "raw_data": {"mock": True},
+        })
+    return results
+
+async def scrape_meta_direct_v2(brand: str, countries: list[str]):
+    """
+    Hybrid: Requests -> Playwright GraphQL (real ads only – no mock/demo).
+    Returns deduped ads. Empty list if nothing real found.
+    """
+    all_results = []
+    for country in countries:
+        # 1. Requests (fast, no deps)
+        req_res = await scrape_via_requests(brand, country)
+        if req_res:
+            all_results.extend(req_res)
+            continue
+        # 2. Playwright GraphQL (real Library IDs + real creative)
+        pw_res = await scrape_via_playwright(brand, country)
+        if pw_res:
+            all_results.extend(pw_res)
+    # Real ads only: drop any mock/fake IDs
+    def _is_real(r):
+        return str(r.get("ad_archive_id", "")).isdigit()
+    all_results = [r for r in all_results if _is_real(r)]
+    # Deduplicate
+    seen = set()
+    uniq = []
+    for r in all_results:
+        if r["ad_archive_id"] not in seen:
+            seen.add(r["ad_archive_id"])
+            uniq.append(r)
+    return uniq
