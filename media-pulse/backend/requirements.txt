@@ -15,5 +15,10 @@ openpyxl==3.1.2
 python-dotenv==1.0.0
 httpx==0.25.2
 aiosqlite==0.19.0
-pytest==7.4.3
-pytest-asyncio==0.23.2
+textblob==0.17.1
+groq==0.4.2
+vaderSentiment==3.3.2
+deep-translator==1.11.4
+nrclex==3.0.0
+ddgs==4.2.1
+google-play-scraper==1.2.4
