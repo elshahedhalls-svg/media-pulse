@@ -9,7 +9,7 @@
 | Component | URL |
 |-----------|-----|
 | **Landing Page** | [media-pulse-landing.vercel.app](https://media-pulse-landing.vercel.app) |
-| **Frontend Demo** | [media-pulse.vercel.app](https://media-pulse.vercel.app) |
+| **Frontend Demo** | [media-pulse-six.vercel.app](https://media-pulse-six.vercel.app) |
 | **Backend API** | [media-pulse-production.up.railway.app](https://media-pulse-production.up.railway.app) |
 | **API Docs** | [media-pulse-production.up.railway.app/docs](https://media-pulse-production.up.railway.app/docs) |
 
