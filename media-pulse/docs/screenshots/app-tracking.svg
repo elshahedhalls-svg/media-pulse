@@ -1,0 +1,68 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Header -->
+  <rect width="600" height="50" fill="#1e293b"/>
+  <rect x="20" y="15" width="24" height="20" rx="4" fill="#3b82f6"/>
+  <text x="50" y="30" fill="white" font-size="14" font-weight="bold">Media Pulse</text>
+  
+  <!-- Tabs -->
+  <rect x="0" y="50" width="600" height="40" fill="#334155"/>
+  <rect x="120" y="50" width="120" height="40" fill="#10b981"/>
+  <text x="180" y="75" text-anchor="middle" fill="white" font-size="11">App Tracking</text>
+  
+  <!-- App Tabs -->
+  <rect x="20" y="100" width="560" height="35" rx="6" fill="#f1f5f9"/>
+  <rect x="22" y="102" width="80" height="31" rx="4" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="62" y="122" text-anchor="middle" font-size="10">Overview</text>
+  <text x="150" y="122" text-anchor="middle" font-size="10" fill="#64748b">History</text>
+  <text x="230" y="122" text-anchor="middle" font-size="10" fill="#64748b">Sentiment</text>
+  <text x="330" y="122" text-anchor="middle" font-size="10" fill="#64748b">Keywords</text>
+  <text x="420" y="122" text-anchor="middle" font-size="10" fill="#64748b">Countries</text>
+  <text x="500" y="122" text-anchor="middle" font-size="10" fill="#64748b">Weekly</text>
+  
+  <!-- Stats Cards -->
+  <rect x="20" y="150" width="130" height="80" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="85" y="180" text-anchor="middle" font-size="22" font-weight="bold" fill="#10b981">651K</text>
+  <text x="85" y="205" text-anchor="middle" font-size="10" fill="#64748b">Installs</text>
+  
+  <rect x="160" y="150" width="130" height="80" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="225" y="180" text-anchor="middle" font-size="22" font-weight="bold" fill="#f59e0b">4.2★</text>
+  <text x="225" y="205" text-anchor="middle" font-size="10" fill="#64748b">Rating</text>
+  
+  <rect x="300" y="150" width="130" height="80" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="365" y="180" text-anchor="middle" font-size="22" font-weight="bold" fill="#3b82f6">12.5K</text>
+  <text x="365" y="205" text-anchor="middle" font-size="10" fill="#64748b">Daily Downloads</text>
+  
+  <rect x="440" y="150" width="150" height="80" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="515" y="180" text-anchor="middle" font-size="22" font-weight="bold" fill="#22c55e">+8.5%</text>
+  <text x="515" y="205" text-anchor="middle" font-size="10" fill="#64748b">Growth</text>
+  
+  <!-- Chart Area -->
+  <rect x="20" y="245" width="380" height="140" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="30" y="265" font-size="11" font-weight="bold" fill="#1e293b">Downloads Trend</text>
+  <polyline points="40,360 80,340 120,350 160,320 200,330 240,300 280,310 320,280 360,290" 
+            fill="none" stroke="#10b981" stroke-width="2"/>
+  <circle cx="40" cy="360" r="3" fill="#10b981"/>
+  <circle cx="120" cy="350" r="3" fill="#10b981"/>
+  <circle cx="200" cy="330" r="3" fill="#10b981"/>
+  <circle cx="280" cy="310" r="3" fill="#10b981"/>
+  <circle cx="360" cy="290" r="3" fill="#10b981"/>
+  
+  <!-- Rating Distribution -->
+  <rect x="410" y="245" width="180" height="140" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="420" y="265" font-size="11" font-weight="bold" fill="#1e293b">Rating Distribution</text>
+  <rect x="420" y="280" width="100" height="10" rx="2" fill="#e2e8f0"/>
+  <rect x="420" y="280" width="80" height="10" rx="2" fill="#22c55e"/>
+  <text x="530" y="289" font-size="9" fill="#64748b">5★ 80%</text>
+  <rect x="420" y="298" width="100" height="10" rx="2" fill="#e2e8f0"/>
+  <rect x="420" y="298" width="50" height="10" rx="2" fill="#22c55e"/>
+  <text x="530" y="307" font-size="9" fill="#64748b">4★ 50%</text>
+  <rect x="420" y="316" width="100" height="10" rx="2" fill="#e2e8f0"/>
+  <rect x="420" y="316" width="30" height="10" rx="2" fill="#f59e0b"/>
+  <text x="530" y="325" font-size="9" fill="#64748b">3★ 30%</text>
+  <rect x="420" y="334" width="100" height="10" rx="2" fill="#e2e8f0"/>
+  <rect x="420" y="334" width="15" height="10" rx="2" fill="#ef4444"/>
+  <text x="530" y="343" font-size="9" fill="#64748b">2★ 15%</text>
+  <rect x="420" y="352" width="100" height="10" rx="2" fill="#e2e8f0"/>
+  <rect x="420" y="352" width="8" height="10" rx="2" fill="#ef4444"/>
+  <text x="530" y="361" font-size="9" fill="#64748b">1★ 8%</text>
+</svg>

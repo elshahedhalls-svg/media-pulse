@@ -1,0 +1,73 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Header -->
+  <rect width="600" height="50" fill="#1e293b"/>
+  <rect x="20" y="15" width="24" height="20" rx="4" fill="#3b82f6"/>
+  <text x="50" y="30" fill="white" font-size="14" font-weight="bold">Media Pulse</text>
+  
+  <!-- Tabs -->
+  <rect x="0" y="50" width="600" height="40" fill="#334155"/>
+  <rect x="360" y="50" width="120" height="40" fill="#f43f5e"/>
+  <text x="420" y="75" text-anchor="middle" fill="white" font-size="11">TikTok Ads</text>
+  
+  <!-- Sub Tabs -->
+  <rect x="20" y="100" width="560" height="35" rx="6" fill="#f1f5f9"/>
+  <rect x="22" y="102" width="80" height="31" rx="4" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="62" y="122" text-anchor="middle" font-size="10">Search</text>
+  <text x="150" y="122" text-anchor="middle" font-size="10" fill="#64748b">Hashtags</text>
+  <text x="250" y="122" text-anchor="middle" font-size="10" fill="#64748b">Videos</text>
+  <text x="340" y="122" text-anchor="middle" font-size="10" fill="#64748b">Analytics</text>
+  
+  <!-- Search Bar -->
+  <rect x="20" y="150" width="250" height="36" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="30" y="172" font-size="12" fill="#94a3b8">Search Keyword...</text>
+  
+  <!-- Filter -->
+  <rect x="280" y="150" width="100" height="36" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="330" y="172" text-anchor="middle" font-size="11" fill="#64748b">Country ▼</text>
+  
+  <!-- Load Button -->
+  <rect x="390" y="150" width="80" height="36" rx="6" fill="#f43f5e"/>
+  <text x="430" y="172" text-anchor="middle" fill="white" font-size="11">Load</text>
+  
+  <!-- Hashtag Card 1 -->
+  <rect x="20" y="200" width="180" height="80" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="30" y="225" font-size="14" font-weight="bold" fill="#1e293b">#vodafone</text>
+  <text x="30" y="245" font-size="10" fill="#64748b">12.5M views</text>
+  <text x="30" y="265" font-size="10" fill="#22c55e">Trending</text>
+  
+  <!-- Hashtag Card 2 -->
+  <rect x="210" y="200" width="180" height="80" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="220" y="225" font-size="14" font-weight="bold" fill="#1e293b">#etisalat</text>
+  <text x="220" y="245" font-size="10" fill="#64748b">8.3M views</text>
+  <text x="220" y="265" font-size="10" fill="#22c55e">Trending</text>
+  
+  <!-- Hashtag Card 3 -->
+  <rect x="400" y="200" width="180" height="80" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="410" y="225" font-size="14" font-weight="bold" fill="#1e293b">#orange</text>
+  <text x="410" y="245" font-size="10" fill="#64748b">5.1M views</text>
+  <text x="410" y="265" font-size="10" fill="#f59e0b">Rising</text>
+  
+  <!-- Video Card 1 -->
+  <rect x="20" y="295" width="180" height="90" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <rect x="20" y="295" width="180" height="40" rx="8" fill="#f1f5f9"/>
+  <text x="30" y="318" font-size="10" font-weight="bold" fill="#1e293b">Video: "Best Network"</text>
+  <text x="30" y="345" font-size="10" fill="#64748b">Views: 1.2M</text>
+  <text x="30" y="360" font-size="10" fill="#64748b">Likes: 45K</text>
+  <text x="30" y="375" font-size="10" fill="#64748b">Shares: 12K</text>
+  
+  <!-- Video Card 2 -->
+  <rect x="210" y="295" width="180" height="90" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <rect x="210" y="295" width="180" height="40" rx="8" fill="#f1f5f9"/>
+  <text x="220" y="318" font-size="10" font-weight="bold" fill="#1e293b">Video: "5G Speed"</text>
+  <text x="220" y="345" font-size="10" fill="#64748b">Views: 890K</text>
+  <text x="220" y="360" font-size="10" fill="#64748b">Likes: 32K</text>
+  <text x="220" y="375" font-size="10" fill="#64748b">Shares: 8K</text>
+  
+  <!-- Video Card 3 -->
+  <rect x="400" y="295" width="180" height="90" rx="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <rect x="400" y="295" width="180" height="40" rx="8" fill="#f1f5f9"/>
+  <text x="410" y="318" font-size="10" font-weight="bold" fill="#1e293b">Video: "Family Plan"</text>
+  <text x="410" y="345" font-size="10" fill="#64748b">Views: 650K</text>
+  <text x="410" y="360" font-size="10" fill="#64748b">Likes: 28K</text>
+  <text x="410" y="375" font-size="10" fill="#64748b">Shares: 6K</text>
+</svg>
