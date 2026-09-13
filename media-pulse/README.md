@@ -1,58 +1,87 @@
-# Media Pulse – Media Buying Intelligence (Demo)
+# Media Pulse – Media Buying Intelligence Platform
 
-**Supabase Project:** `Media Pulse` – https://rpbybnbrcyfrqjgqpkxi.supabase.co
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> Demo هيكل جاهز – Ad Library (Meta) + Dual Language + Auth + Export – Scraping مباشر + Meta Graph API
+> منصة ذكية لتتبع الإعلانات والمنافسين وتحليل المشاعر – دعم كامل للعربية والإنجليزية
 
-## 🔐 البيانات الحساسة
-- **SUPABASE_URL:** `https://rpbybnbrcyfrqjgqpkxi.supabase.co`
-- **ANON_KEY:** `eyJhbG...3uM` (في `backend/.env` فقط، 600 perms)
-- **META_TOKEN:** `EAAPKo...` + APP_ID `1067217365774980` في `backend/.env` فقط – لا يُرفع لـ Git
+## 🚀 Live Demo
 
-## 📁 الهيكل
+| Component | URL |
+|-----------|-----|
+| **Landing Page** | [media-pulse-landing.vercel.app](https://media-pulse-landing.vercel.app) |
+| **Frontend Demo** | [media-pulse.vercel.app](https://media-pulse.vercel.app) |
+| **Backend API** | [media-pulse-production.up.railway.app](https://media-pulse-production.up.railway.app) |
+| **API Docs** | [media-pulse-production.up.railway.app/docs](https://media-pulse-production.up.railway.app/docs) |
+
+**Demo Credentials:** `admin1` / `Admin123!`
+
+## ✨ Features
+
+- 📊 **Meta Ad Library Monitoring** – Track competitor ads across Facebook, Instagram, Messenger
+- 📱 **App Store & Google Play Tracking** – Exact install numbers, ratings, rankings
+- 💬 **Sentiment Analysis** – AI-powered analysis using VADER + TextBlob + NRCLex ensemble
+- 🔑 **ASO Keywords Generation** – Optimize app store visibility
+- 🌍 **Country Analytics** – Track performance across Egypt & GCC countries
+- 🎵 **TikTok Integration** – Trending hashtags, videos, ad analytics
+- 🌐 **Bilingual Support** – Full Arabic/English with RTL support
+- 🔐 **Role-based Auth** – Admin, Analyst, Viewer roles
+
+## 📁 Project Structure
+
 ```
 media-pulse/
-├── backend/
-│   ├── main.py (FastAPI)
-│   ├── models.py (users, brands, countries, ads, jobs)
-│   ├── database.py (SQLite default / Postgres optional)
-│   ├── data/regions.py (EG + 6 GCC)
-│   ├── services/meta_api.py (Graph API ads_archive)
-│   ├── services/meta_scraper.py (Playwright fallback – mock للـ Demo)
-│   ├── services/estimation.py (CPM EG $1.5 GCC $6-8)
-│   ├── .env (600) + .env.example
+├── backend/                    # FastAPI Backend
+│   ├── main.py                 # API routes
+│   ├── models.py               # SQLAlchemy models
+│   ├── crud.py                 # Database operations
+│   ├── services/               # Business logic
+│   │   ├── auth.py             # JWT authentication
+│   │   ├── brand_sentiment.py  # Sentiment analysis
+│   │   ├── playstore.py        # Google Play scraper
+│   │   ├── tiktok.py           # TikTok integration
+│   │   └── scrapers/           # Multi-source scrapers
+│   ├── tests/                  # 90 tests
 │   └── requirements.txt
-├── frontend/
-│   ├── src/pages/AdLibrary.tsx (Search + Checkbox EG/GCC + Update Now + Export)
-│   ├── src/pages/Login.tsx (5 users)
-│   ├── src/i18n/{ar,en}.json (Dual)
-│   └── src/api/client.ts
-├── docker-compose.yml
-└── README.md
+├── frontend/                   # React + Vite
+│   ├── src/
+│   │   ├── pages/              # Main pages
+│   │   │   ├── AdLibrary.tsx   # Meta Ad monitoring
+│   │   │   ├── AppTracking.tsx # App store tracking
+│   │   │   ├── BrandIntelligence.tsx # Sentiment analysis
+│   │   │   └── TikTokAds.tsx   # TikTok analytics
+│   │   ├── components/         # Shared components
+│   │   ├── api/                # API client
+│   │   └── i18n/               # Translations (AR/EN)
+│   └── package.json
+├── landing/                    # Landing page
+│   ├── index.html
+│   ├── styles.css
+│   └── script.js
+└── docker-compose.yml
 ```
 
-## 🗄️ إعداد الداتابيز – خطوة بخطوة (3 خيارات)
+## 🛠️ Tech Stack
 
-### الخيار A: SQLite المحلي (الافتراضي للـ Demo – لا يحتاج Supabase Password)
-- الملف `backend/media_pulse.db` يُنشأ أوتوماتيك عند أول تشغيل
-- الجداول تُنشأ من `models.py` + `crud.init_db()` (regions + 7 دول + 5 يوزرز)
-- لا تحتاج أي خطوة يدوية
+**Backend:**
+- FastAPI + Uvicorn
+- SQLAlchemy + PostgreSQL (Supabase)
+- VADER + TextBlob + NRCLex (Sentiment)
+- Groq LLM (Advanced Analysis)
+- DuckDuckGo Search (Web Scraping)
 
-### الخيار B: Supabase Postgres (للـ Cloud)
-1. ادخل Supabase → مشروع Media Pulse → `Settings` → `Database`
-2. انسخ `Connection string` → `URI` (شكل `postgresql://postgres.rpbybn...:PASSWORD@aws-0-eu-central-1.pooler.supabase.com:6543/postgres`)
-3. ضع PASSWORD الذي اخترته عند إنشاء المشروع (لو نسيته: `Reset DB Password`)
-4. في `backend/.env` غيّر:
-   ```
-   DATABASE_URL=postgresql://postgres.rpbybnbrcyfrqjgqpkxi:YOUR_PASSWORD@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
-   ```
-5. شغّل Backend – الجداول ستُنشأ تلقائياً
+**Frontend:**
+- React 18 + TypeScript
+- Vite + TailwindCSS 4
+- Recharts (Charts)
+- i18n (AR/EN)
 
-### الخيار C: Supabase SQL Editor (إنشاء يدوي)
-- في Supabase → `SQL Editor` → `New Query` → شغّل SQL من `backend/models.py` (أو انسخ من `crud.py: init_db`)
-- الجداول: `users, regions, countries, brands, keywords, ads, apps_tracked, app_snapshots, scrape_jobs, settings`
+**Deployment:**
+- Backend: Railway
+- Frontend: Vercel
+- Database: Supabase PostgreSQL
 
-## 👥 اليوزرز الافتراضية (5)
+## 👥 Demo Users
+
 | Username | Password | Role |
 |----------|----------|------|
 | admin1 | Admin123! | admin |
@@ -61,48 +90,79 @@ media-pulse/
 | viewer1 | Viewer123! | viewer |
 | viewer2 | Viewer123! | viewer |
 
-تُنشأ أوتوماتيك عند أول تشغيل – JWT 24h
+## 🚀 Local Development
 
-## 🚀 التشغيل
+### Prerequisites
+- Python 3.11+
+- Node.js 20+
+- PostgreSQL (or Supabase account)
 
-### عبر Docker (موصى به – بدون pip/node محلي)
+### Backend Setup
 ```bash
-cd media-pulse
-docker compose up --build
-# Backend: http://localhost:8000/docs
-# Frontend: http://localhost:5173
-# Login: admin1 / Admin123!
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Create .env from example
+cp .env.example .env
+# Edit .env with your database URL
+
+# Start server
+uvicorn main:app --reload --port 8000
 ```
 
-### محلي (يحتاج Python 3.11 + Node 20)
+### Frontend Setup
 ```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-
-# Frontend (terminal ثاني)
 cd frontend
 npm install
+
+# Create .env
+echo "VITE_API_URL=http://localhost:8000" > .env
+
+# Start dev server
 npm run dev
 ```
 
-## 🧪 تجربة Demo
-1. Login `admin1/Admin123!`
-2. في Ad Library اكتب `Vodafone` + اختر `EG, SA` + `Update Now`
-3. سترى إعلانات (من Meta API إن نجح، أو Mock Fallback للـ Demo) مع Spend/Impressions تقديري + Disclaimer
-4. `Export Excel` ينزل ملف مفصول Per Country
+### Docker Setup
+```bash
+docker compose up --build
+# Backend: http://localhost:8000/docs
+# Frontend: http://localhost:5173
+```
 
-## 🔑 Meta API
-- Endpoint: `GET https://graph.facebook.com/v20.0/ads_archive?search_terms={brand}&ad_reached_countries=['EG']&fields=...`
-- Fallback للـ Scraping المباشر إذا فشل API
-- التوكن في `.env` فقط
+## 🧪 Testing
 
-## 🌐 Dual Language
-- Toggle `AR | EN` في الهيدر – يحفظ في localStorage ويغير `dir=rtl/ltr`
+```bash
+# Backend tests (90 tests)
+cd backend
+python -m pytest tests/ -v
 
-## ⚠️ ملاحظات
-- الكريتيف لا يُخزن – `snapshot_url` فقط (fetch live)
-- الأرقام تقديرية Range مع Disclaimer واضح
-- التحديث On-Demand فقط (زر تحديث) – لا Cron كل ساعتين
-- Keywords تُولد Auto + Modal تخصيص
+# Frontend tests
+cd frontend
+npm run test
+```
+
+## 🌍 Supported Countries
+
+| Country | Code |
+|---------|------|
+| 🇪🇬 Egypt | EG |
+| 🇸🇦 Saudi Arabia | SA |
+| 🇦🇪 UAE | AE |
+| 🇶🇦 Qatar | QA |
+| 🇰🇼 Kuwait | KW |
+| 🇧🇭 Bahrain | BH |
+| 🇴🇲 Oman | OM |
+
+## 📝 License
+
+MIT License - feel free to use for your projects.
+
+## 🤝 Contributing
+
+Contributions welcome! Please open an issue or PR.
+
+## 📧 Contact
+
+For questions or support, open an issue on GitHub.
