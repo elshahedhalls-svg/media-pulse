@@ -61,7 +61,19 @@ def get_current_user(authorization: str = Header(None), db: Session = Depends(ge
 # --- Health ---
 @app.get("/api/health")
 def health():
-    return {"status":"ok", "service":"media-pulse", "meta_token_valid": test_token_valid(), "time": datetime.utcnow().isoformat()}
+    # Diagnostic: which commit is live + is Meta scraping capable?
+    pw_status = {"installed": False, "chromium": False}
+    try:
+        import playwright  # noqa
+        pw_status["installed"] = True
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            pw_status["chromium"] = bool(p.chromium.executable_path)
+    except Exception as e:
+        pw_status["error"] = str(e)[:120]
+    return {"status":"ok", "service":"media-pulse", "meta_token_valid": test_token_valid(),
+            "commit": os.getenv("RAILWAY_GIT_COMMIT_SHA", "local")[:8],
+            "playwright": pw_status, "time": datetime.utcnow().isoformat()}
 
 @app.get("/api/supabase-config")
 def supabase_config():
