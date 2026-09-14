@@ -63,6 +63,7 @@ async def scrape_via_requests(brand: str, country: str):
 
 async def scrape_via_playwright(brand: str, country: str):
     """Playwright – يعترض GraphQL الحقيقي للحصول على Library ID والـ Creative الحقيقي وروابط مباشرة"""
+    DIAG.update({"stage": "started", "error": None, "query": brand, "country": country})
     try:
         from playwright.async_api import async_playwright
         import json
@@ -95,24 +96,33 @@ async def scrape_via_playwright(brand: str, country: str):
                             captured["list"].append(body)
                     except: pass
             page.on("response", handle_response)
-            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(8000)
-            # Scroll several times to trigger GraphQL search load
-            try:
-                for _ in range(4):
-                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                    await page.wait_for_timeout(4000)
-                await page.evaluate("window.scrollTo(0, 0)")
-                await page.wait_for_timeout(2000)
-            except: pass
-            # Wait for GraphQL to be captured (up to 20s)
-            for _ in range(40):
-                if captured["list"]:
-                    break
-                await page.wait_for_timeout(500)
-            await page.content()
+            # محاولتان: أحياناً البحث لا يُطلق من أول تحميل (throttle من فيسبوك)
             page_title = ""
             html_len = 0
+            for attempt in range(2):
+                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                await page.wait_for_timeout(10000)
+                # Scroll several times to trigger GraphQL search load
+                try:
+                    for _ in range(4):
+                        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        await page.wait_for_timeout(4000)
+                    await page.evaluate("window.scrollTo(0, 0)")
+                    await page.wait_for_timeout(2000)
+                except: pass
+                # Wait for GraphQL to be captured (up to 20s)
+                for _ in range(40):
+                    if captured["list"]:
+                        break
+                    await page.wait_for_timeout(500)
+                if captured["list"]:
+                    break
+                try:
+                    page_title = await page.title()
+                    html_len = len(await page.content())
+                except: pass
+                print(f"[GraphQL] attempt {attempt + 1} no capture for {brand} {country} (graphql={captured['graphql_total']}) – reloading")
+            await page.content()
             try:
                 page_title = await page.title()
                 html_len = len(await page.content())
