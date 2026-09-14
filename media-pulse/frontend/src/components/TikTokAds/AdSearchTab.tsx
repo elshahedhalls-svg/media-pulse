@@ -39,7 +39,7 @@ export function AdSearchTab(props: AdSearchTabProps) {
                 value={props.keyword}
                 onChange={(e) => props.onKeywordChange(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && props.onSearch()}
-                placeholder={lang === "ar" ? "مثال: Vodafone, اتصالات..." : "e.g. Vodafone, Etisalat..."}
+                placeholder={lang === "ar" ? "مثال: مباشر، Mubasher..." : "e.g. Mubasher..."}
                 className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
               />
               <button onClick={props.onSearch} disabled={loading} aria-label={lang === "ar" ? "بحث" : "Search"} className="px-4 py-2 bg-rose-500 text-white rounded-lg text-sm hover:bg-rose-600 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-rose-500">

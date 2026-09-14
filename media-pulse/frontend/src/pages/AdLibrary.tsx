@@ -10,9 +10,9 @@ import { PreviewBar } from "../components/AdLibrary/PreviewBar";
 import type { Ad, AdPreview, AdStats, Country, PagePreview } from "../types/ad";
 
 export default function AdLibrary({ t, lang }: { t: any; lang: string }) {
-  const [brand, setBrand] = useState("Vodafone");
+  const [brand, setBrand] = useState("Mubasher");
   const [pageName, setPageName] = useState("");
-  const [countries, setCountries] = useState<string[]>(["EG","SA"]);
+  const [countries, setCountries] = useState<string[]>(["EG"]);
   const [platform] = useState("meta");
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(false);
@@ -121,7 +121,7 @@ export default function AdLibrary({ t, lang }: { t: any; lang: string }) {
           <div className="relative">
             <label htmlFor="ad-page-input" className="block text-xs font-medium text-slate-700 mb-1">{lang==="ar" ? "اسم الصفحة (اختياري)" : "Page name (optional)"}</label>
             <Building2 size={16} className="absolute start-3 top-[38px] -translate-y-1/2 text-violet-400" aria-hidden="true" />
-            <input id="ad-page-input" value={pageName} onChange={e=>{setPageName(e.target.value); setShowPageSuggest(true);}} onFocus={()=> pageName.trim().length>=1 && setShowPageSuggest(true)} onBlur={()=> setTimeout(()=> setShowPageSuggest(false), 200)} placeholder={lang==="ar" ? "اسم الصفحة (اختياري) – مثلاً: Vodafone Egypt" : "Page name (optional) – e.g. Vodafone Egypt"} className="w-full ps-9 pe-8 py-2 text-sm bg-violet-50 border border-violet-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500" />
+            <input id="ad-page-input" value={pageName} onChange={e=>{setPageName(e.target.value); setShowPageSuggest(true);}} onFocus={()=> pageName.trim().length>=1 && setShowPageSuggest(true)} onBlur={()=> setTimeout(()=> setShowPageSuggest(false), 200)} placeholder={lang==="ar" ? "اسم الصفحة (اختياري) – مثلاً: Mubasher" : "Page name (optional) – e.g. Mubasher"} className="w-full ps-9 pe-8 py-2 text-sm bg-violet-50 border border-violet-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500" />
             <ChevronDown size={14} className="absolute end-3 top-[38px] -translate-y-1/2 text-violet-400" aria-hidden="true" />
             <p className="text-[10px] text-violet-500 mt-1">{lang==="ar" ? "اكتب اسم الصفحة ليظهر إعلاناتها فقط – سيظهر اقتراحات تلقائياً" : "Type page name – suggestions will appear automatically"}</p>
             {showPageSuggest && pageSuggestions.length>0 && (

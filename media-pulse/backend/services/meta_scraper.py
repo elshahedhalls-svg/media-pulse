@@ -12,23 +12,23 @@ from services.estimation import estimate_budget_and_impressions
 MOCK_ADS = [
     {
         "ad_archive_id": "mock_1001",
-        "page_name": "Vodafone Egypt",
-        "creative_body": "عروض الصيف من فودافون - باقة 100 جيجا بسعر 150 جنيه!",
+        "page_name": "Mubasher",
+        "creative_body": "تابع السوق لحظة بلحظة مع مباشر - حمّل تطبيق Mubasher Info!",
         "countries": ["EG"],
         "start_offset_days": 12,
     },
     {
         "ad_archive_id": "mock_1002",
-        "page_name": "Vodafone Egypt",
-        "creative_body": "Vodafone Ramadan Offer - Unlimited calls + 50GB",
-        "countries": ["EG", "SA"],
+        "page_name": "Mubasher Trade",
+        "creative_body": "Mubasher Trade - تداول الأسهم المصرية بعمولة تبدأ من 0.1%",
+        "countries": ["EG"],
         "start_offset_days": 45,
     },
     {
         "ad_archive_id": "mock_1003",
-        "page_name": "Etisalat UAE",
-        "creative_body": "Etisalat 5G - أسرع إنترنت في الإمارات",
-        "countries": ["AE"],
+        "page_name": "Smart Signals",
+        "creative_body": "Smart Signals - إشارات تداول ذكية للسوق المصري",
+        "countries": ["EG"],
         "start_offset_days": 7,
     },
 ]
@@ -52,8 +52,8 @@ async def scrape_meta_direct(brand: str, countries: list[str]):
     for mock in MOCK_ADS:
         # Simple brand matching
         if brand_lower not in mock["page_name"].lower() and brand_lower not in mock["creative_body"].lower():
-            # Allow if brand is generic test like "vodafone" or "test"
-            if brand_lower not in ["vodafone", "test", "فودافون", "careem", "etisalat"]:
+            # Allow if brand is generic test like "mubasher" or "test"
+            if brand_lower not in ["mubasher", "test", "مباشر", "careem", "etisalat"]:
                 continue
         # Country filter
         if not any(c in mock["countries"] for c in countries):

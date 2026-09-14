@@ -196,8 +196,8 @@ async def scrape_via_playwright(brand: str, country: str):
 
 # Keep old mock for final fallback
 MOCK_ADS = [
-    {"ad_archive_id": "mock_1001", "page_name": "Vodafone Egypt", "creative_body": "عروض الصيف من فودافون - باقة 100 جيجا بسعر 150 جنيه!", "countries": ["EG"], "start_offset_days": 12},
-    {"ad_archive_id": "mock_1002", "page_name": "Vodafone Egypt", "creative_body": "Vodafone Ramadan Offer - Unlimited calls + 50GB", "countries": ["EG", "SA"], "start_offset_days": 45},
+    {"ad_archive_id": "mock_1001", "page_name": "Mubasher", "creative_body": "تابع السوق لحظة بلحظة مع مباشر - حمّل تطبيق Mubasher Info!", "countries": ["EG"], "start_offset_days": 12},
+    {"ad_archive_id": "mock_1002", "page_name": "Mubasher Trade", "creative_body": "Mubasher Trade - تداول الأسهم المصرية بعمولة تبدأ من 0.1%", "countries": ["EG"], "start_offset_days": 45},
 ]
 
 def mock_fallback(brand: str, countries: list[str]):
@@ -205,7 +205,7 @@ def mock_fallback(brand: str, countries: list[str]):
     brand_lower = brand.lower()
     for mock in MOCK_ADS:
         if brand_lower not in mock["page_name"].lower() and brand_lower not in mock["creative_body"].lower():
-            if brand_lower not in ["vodafone", "test", "فودافون", "careem"]:
+            if brand_lower not in ["mubasher", "test", "مباشر", "careem"]:
                 continue
         if not any(c in mock["countries"] for c in countries):
             continue

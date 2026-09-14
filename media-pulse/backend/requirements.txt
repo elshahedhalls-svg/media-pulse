@@ -10,7 +10,7 @@ bcrypt==4.0.1
 python-multipart==0.0.6
 requests==2.31.0
 beautifulsoup4==4.12.2
-# playwright==1.40.0  # Optional: requires system deps
+playwright==1.62.0  # Required: Meta Ad Library GraphQL scraping (needs chromium + system deps)
 openpyxl==3.1.2
 python-dotenv==1.0.0
 httpx==0.25.2

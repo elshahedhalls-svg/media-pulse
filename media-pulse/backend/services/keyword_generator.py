@@ -5,6 +5,7 @@ import re
 
 # Simple transliteration map for demo (can be replaced with better lib)
 AR_TRANSLITERATION = {
+    "mubasher": "مباشر",
     "vodafone": "فودافون",
     "careem": "كريم",
     "uber": "أوبر",

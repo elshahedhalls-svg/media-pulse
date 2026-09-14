@@ -5,6 +5,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Chromium + system deps for Playwright (Meta Ad Library scraping)
+RUN python -m playwright install --with-deps chromium
+
 COPY . .
 
 EXPOSE 8000
