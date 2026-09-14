@@ -168,12 +168,18 @@ async def preview_ads(req: AdSearchRequest, db: Session = Depends(get_db), curre
                 pages[pn]["countries"].append(c)
                 pages[pn]["countries"].sort()
     plist = sorted(pages.values(), key=lambda p: -p["ads_count"])
+    try:
+        from services.meta_scraper_v2 import get_diag
+        debug = get_diag()
+    except Exception:
+        debug = {}
     return {
         "brand": query,
         "preview_country": country,
         "pages_found": len(plist),
         "total_ads": len(results),
         "pages": plist,
+        "debug": debug,
         "note": f"Preview scanned {country} only. Full search will scan: {', '.join(req.countries)}" if len(req.countries) > 1 else f"Preview scanned {country}",
     }
 

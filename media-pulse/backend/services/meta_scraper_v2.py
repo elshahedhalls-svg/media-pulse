@@ -11,6 +11,12 @@ from datetime import datetime, timedelta
 import random
 from services.estimation import estimate_budget_and_impressions, USD_TO_EGP
 
+# Last-run diagnostics (surfaced via /api/ads/preview debug field)
+DIAG: dict = {"stage": "never_run", "error": None}
+
+def get_diag() -> dict:
+    return dict(DIAG)
+
 def decode_unicode(s: str) -> str:
     """فك تشفير \u0627 إلى عربي حقيقي – فقط إذا كان يحتوي على \\u"""
     if not s:
@@ -89,6 +95,10 @@ async def scrape_via_playwright(brand: str, country: str):
                     break
                 await page.wait_for_timeout(500)
             await page.content()
+            page_title = ""
+            try:
+                page_title = await page.title()
+            except: pass
             await browser.close()
 
             # إذا التقطنا GraphQL حقيقي، استخدمه
@@ -182,15 +192,19 @@ async def scrape_via_playwright(brand: str, country: str):
                             })
                     if results:
                         print(f"[GraphQL] Captured {len(results)} real ads for {brand} {country}")
+                        DIAG.update({"stage": "ok", "error": None, "ads": len(results), "query": brand, "country": country})
                         return results
                 except Exception as e:
                     print(f"[GraphQL Parse] failed: {e}")
+                    DIAG.update({"stage": "graphql_parse", "error": str(e)[:300], "query": brand, "country": country})
                     import traceback; traceback.print_exc()
 
             else:
                 print(f"[GraphQL] No capture for {brand} {country} – returning []")
+                DIAG.update({"stage": "no_graphql_capture", "error": f"page_title={page_title[:100]}", "query": brand, "country": country})
     except Exception as e:
         print(f"[Playwright GraphQL] {country} failed: {e}")
+        DIAG.update({"stage": "playwright_failed", "error": str(e)[:300], "query": brand, "country": country})
         import traceback; traceback.print_exc()
     return []
 
