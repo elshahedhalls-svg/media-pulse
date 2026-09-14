@@ -67,7 +67,7 @@ async def scrape_via_playwright(brand: str, country: str):
         from playwright.async_api import async_playwright
         import json
         url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&is_targeted_country=false&media_type=all&q={brand}&search_type=keyword_unordered"
-        captured = {"list": [], "graphql_total": 0, "ad_library_hits": 0}
+        captured = {"list": [], "graphql_total": 0, "ad_library_hits": 0, "ad_lib_keys": [], "errors": []}
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"])
             page = await browser.new_page(user_agent=BROWSER_HEADERS["User-Agent"])
@@ -79,6 +79,18 @@ async def scrape_via_playwright(brand: str, country: str):
                         body = await resp.text()
                         if "ad_library_main" in body:
                             captured["ad_library_hits"] += 1
+                            try:
+                                dec = json.JSONDecoder()
+                                obj, _ = dec.raw_decode(body.lstrip())
+                                main = ((obj.get("data") or {}).get("ad_library_main")) or {}
+                                for k in list(main.keys())[:12]:
+                                    if k not in captured["ad_lib_keys"]:
+                                        captured["ad_lib_keys"].append(k)
+                                errs = obj.get("errors")
+                                if errs and len(captured["errors"]) < 3:
+                                    captured["errors"].append(str(errs)[:200])
+                            except Exception:
+                                pass
                         if "search_results_connection" in body:
                             captured["list"].append(body)
                     except: pass
@@ -100,8 +112,10 @@ async def scrape_via_playwright(brand: str, country: str):
                 await page.wait_for_timeout(500)
             await page.content()
             page_title = ""
+            html_len = 0
             try:
                 page_title = await page.title()
+                html_len = len(await page.content())
             except: pass
             await browser.close()
 
@@ -207,7 +221,8 @@ async def scrape_via_playwright(brand: str, country: str):
                 print(f"[GraphQL] No capture for {brand} {country} – returning []")
                 DIAG.update({"stage": "no_graphql_capture", "error": f"page_title={page_title[:100]}",
                              "graphql_total": captured["graphql_total"], "ad_library_hits": captured["ad_library_hits"],
-                             "query": brand, "country": country})
+                             "ad_lib_keys": captured["ad_lib_keys"], "gql_errors": captured["errors"],
+                             "html_len": html_len, "query": brand, "country": country})
     except Exception as e:
         print(f"[Playwright GraphQL] {country} failed: {e}")
         DIAG.update({"stage": "playwright_failed", "error": str(e)[:300], "query": brand, "country": country})
