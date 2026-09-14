@@ -196,29 +196,28 @@ async def search_ads(req: AdSearchRequest, db: Session = Depends(get_db), curren
     try:
         results = []
         api_error = None
-        # Try API first if requested
-        if req.use_api and test_token_valid():
+        # Scraper FIRST (Playwright GraphQL + DOM fallback) — faster, no permission needed
+        try:
+            results = await scrape_meta_direct_v2(query, req.countries)
+            # If page_name filter requested, filter results to matching page
+            if req.page_name and req.page_name.strip():
+                pn_lower = req.page_name.strip().lower()
+                filtered = [r for r in results if pn_lower in (r.get("page_name") or "").lower()]
+                if filtered:
+                    results = filtered
+        except Exception as e2:
+            print(f"V2 scraper failed: {e2}")
+            results = []
+        # Fallback to Meta API if scraper returned nothing
+        if not results and req.use_api and test_token_valid():
             try:
                 results = await search_meta_ads_api(query, req.countries)
                 if not results:
-                    api_error = "No results from API (needs permission at facebook.com/ads/library/api – code 10). Falling back to scraping."
+                    api_error = "No results from API (needs permission at facebook.com/ads/library/api – code 10)."
                     print(api_error)
             except Exception as e:
                 api_error = str(e)
-                print(f"API failed, fallback: {e}")
-                results = []
-        # Fallback to REAL scraper v2 (Requests → Playwright GraphQL – real ads only)
-        if not results:
-            try:
-                results = await scrape_meta_direct_v2(query, req.countries)
-                # If page_name filter requested, filter results to matching page
-                if req.page_name and req.page_name.strip():
-                    pn_lower = req.page_name.strip().lower()
-                    filtered = [r for r in results if pn_lower in (r.get("page_name") or "").lower()]
-                    if filtered:
-                        results = filtered
-            except Exception as e2:
-                print(f"V2 scraper failed: {e2}")
+                print(f"API failed: {e}")
                 results = []
         # إعلانات حقيقية فقط (بدون Demo/Mock نهائياً)
         results = [r for r in results if str(r.get("ad_archive_id", "")).isdigit()]

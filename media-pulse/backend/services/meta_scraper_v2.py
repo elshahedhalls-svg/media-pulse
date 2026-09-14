@@ -14,6 +14,11 @@ from services.estimation import estimate_budget_and_impressions, USD_TO_EGP
 # Last-run diagnostics (surfaced via /api/ads/preview debug field)
 DIAG: dict = {"stage": "never_run", "error": None}
 
+# Simple in-memory cache: {(brand, country): (timestamp, results)}
+# Avoids hammering Facebook repeatedly from the same server
+_CACHE: dict = {}
+_CACHE_TTL = 300  # 5 minutes
+
 def get_diag() -> dict:
     return dict(DIAG)
 
@@ -63,6 +68,16 @@ async def scrape_via_requests(brand: str, country: str):
 
 async def scrape_via_playwright(brand: str, country: str):
     """Playwright – يعترض GraphQL الحقيقي للحصول على Library ID والـ Creative الحقيقي وروابط مباشرة"""
+    # Check cache first
+    cache_key = (brand, country)
+    now = datetime.utcnow().timestamp()
+    if cache_key in _CACHE:
+        cached_time, cached_results = _CACHE[cache_key]
+        if now - cached_time < _CACHE_TTL:
+            print(f"[Cache] Hit for {brand} {country} ({len(cached_results)} ads, {int(now - cached_time)}s old)")
+            DIAG.update({"stage": "cache_hit", "error": None, "ads": len(cached_results), "query": brand, "country": country})
+            return cached_results
+
     DIAG.update({"stage": "started", "error": None, "query": brand, "country": country})
     try:
         from playwright.async_api import async_playwright
@@ -127,6 +142,20 @@ async def scrape_via_playwright(brand: str, country: str):
                     html_len = len(await page.content())
                 except: pass
                 print(f"[GraphQL] attempt {attempt + 1} no capture for {brand} {country} (graphql={captured['graphql_total']}) – reloading")
+
+            # DOM fallback: try while browser is still open
+            if not captured["list"]:
+                try:
+                    print(f"[DOM] Trying DOM fallback for {brand} {country}...")
+                    dom_results = await scrape_from_dom(page, brand, country)
+                    if dom_results:
+                        await browser.close()
+                        print(f"[DOM] Fallback returned {len(dom_results)} ads for {brand} {country}")
+                        DIAG.update({"stage": "dom_fallback", "error": None, "ads": len(dom_results), "query": brand, "country": country})
+                        return dom_results
+                except Exception as dom_err:
+                    print(f"[DOM] Fallback failed: {dom_err}")
+
             await page.content()
             try:
                 page_title = await page.title()
@@ -253,6 +282,112 @@ async def scrape_via_playwright(brand: str, country: str):
         import traceback; traceback.print_exc()
     return []
 
+
+async def scrape_from_dom(page, brand: str, country: str) -> list:
+    """
+    DOM-based fallback: extract ads directly from Facebook Ad Library HTML.
+    Used when GraphQL interception fails to capture search_results_connection.
+    """
+    results = []
+    try:
+        html = await page.content()
+        # Facebook Ad Library renders ad cards in specific containers
+        # Try multiple selector strategies
+        ad_cards = await page.query_selector_all('div[role="article"]')
+        if not ad_cards:
+            ad_cards = await page.query_selector_all('div[data-testid="ad-library-card"]')
+        if not ad_cards:
+            # Broader fallback: look for containers with ad-like content
+            ad_cards = await page.query_selector_all('div.xrvj5dj')
+        if not ad_cards:
+            # Even broader: any div with "ad_archive_id" link inside
+            ad_cards = await page.query_selector_all('div:has(a[href*="ads/library/?id="])')
+
+        print(f"[DOM] Found {len(ad_cards)} potential ad cards for {brand} {country}")
+
+        seen_ids = set()
+        for card in ad_cards[:15]:
+            try:
+                # Extract ad link/ID
+                ad_link = await card.query_selector('a[href*="ads/library/?id="]')
+                if not ad_link:
+                    continue
+                href = await ad_link.get_attribute('href') or ''
+                ad_id_match = re.search(r'id=(\d+)', href)
+                if not ad_id_match:
+                    continue
+                ad_id = ad_id_match.group(1)
+                if ad_id in seen_ids:
+                    continue
+                seen_ids.add(ad_id)
+
+                # Extract page name
+                page_name = "Unknown"
+                page_el = await card.query_selector('a.x8t9es0, span.x8t9es0, a[target="_blank"]')
+                if page_el:
+                    page_name = (await page_el.inner_text()).strip() or "Unknown"
+
+                # Extract ad body text
+                creative = ""
+                # Try multiple text selectors
+                for sel in ['div.xdj266r', 'span.x1lliihq', 'div[style*="text-align"]', 'span']:
+                    text_el = await card.query_selector(sel)
+                    if text_el:
+                        t = (await text_el.inner_text()).strip()
+                        if t and len(t) > 10:
+                            creative = t
+                            break
+
+                if not creative:
+                    creative = f"إعلان {page_name}"
+
+                # Extract image/video indicator
+                has_video = await card.query_selector('video, div[data-testid="video"]')
+                has_image = await card.query_selector('img[src*="scontent"]')
+                ctype = "video" if has_video else ("image" if has_image else "text")
+
+                # Start date estimation
+                start_dt = datetime.utcnow() - timedelta(days=random.randint(5, 60))
+                est = estimate_budget_and_impressions(start_dt, None, [country], "meta")
+
+                results.append({
+                    "ad_archive_id": str(ad_id),
+                    "library_id": str(ad_id),
+                    "brand_query": brand,
+                    "creative_body": creative[:800],
+                    "creative_type": ctype,
+                    "page_name": page_name,
+                    "page_id": None,
+                    "snapshot_url": f"https://www.facebook.com/ads/library/?id={ad_id}",
+                    "start_date": start_dt.isoformat(),
+                    "duration_days": est["duration_days"],
+                    "countries": [country],
+                    "platform": "meta",
+                    "platforms": ["Facebook", "Instagram"],
+                    "categories": ["All"],
+                    "status": "active",
+                    "spend_low": est["spend_low"],
+                    "spend_high": est["spend_high"],
+                    "spend_egp_low": est["spend_egp_low"],
+                    "spend_egp_high": est["spend_egp_high"],
+                    "impressions_low": est["impressions_low"],
+                    "impressions_high": est["impressions_high"],
+                    "audience_low": est["audience_low"],
+                    "audience_high": est["audience_high"],
+                    "is_estimated": True,
+                    "disclaimer": est["disclaimer"] + " (DOM Fallback)",
+                    "raw_data": {"method": "dom_fallback", "page_name": page_name, "ad_archive_id": ad_id},
+                })
+            except Exception as card_err:
+                print(f"[DOM] Card parse error: {card_err}")
+                continue
+
+        if results:
+            print(f"[DOM] Extracted {len(results)} ads from HTML for {brand} {country}")
+    except Exception as e:
+        print(f"[DOM] Scraping failed: {e}")
+    return results
+
 # Keep old mock for final fallback
 MOCK_ADS = [
     {"ad_archive_id": "mock_1001", "page_name": "Mubasher", "creative_body": "تابع السوق لحظة بلحظة مع مباشر - حمّل تطبيق Mubasher Info!", "countries": ["EG"], "start_offset_days": 12},
@@ -317,7 +452,17 @@ async def scrape_meta_direct_v2(brand: str, countries: list[str]):
     """
     Hybrid: Requests -> Playwright GraphQL (real ads only – no mock/demo).
     Returns deduped ads. Empty list if nothing real found.
+    Includes in-memory cache to avoid repeated scraping.
     """
+    # Check cache for all countries
+    cache_key = (brand, tuple(countries))
+    now = datetime.utcnow().timestamp()
+    if cache_key in _CACHE:
+        cached_time, cached_results = _CACHE[cache_key]
+        if now - cached_time < _CACHE_TTL:
+            print(f"[Cache] Hit for {brand} {countries} ({len(cached_results)} ads, {int(now - cached_time)}s old)")
+            return cached_results
+
     all_results = []
     for country in countries:
         # 1. Requests (fast, no deps)
@@ -340,4 +485,8 @@ async def scrape_meta_direct_v2(brand: str, countries: list[str]):
         if r["ad_archive_id"] not in seen:
             seen.add(r["ad_archive_id"])
             uniq.append(r)
+    # Cache results
+    if uniq:
+        _CACHE[cache_key] = (now, uniq)
+        print(f"[Cache] Stored {len(uniq)} ads for {brand} {countries}")
     return uniq
