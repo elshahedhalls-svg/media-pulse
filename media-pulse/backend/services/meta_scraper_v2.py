@@ -17,7 +17,19 @@ DIAG: dict = {"stage": "never_run", "error": None}
 # Simple in-memory cache: {(brand, country): (timestamp, results)}
 # Avoids hammering Facebook repeatedly from the same server
 _CACHE: dict = {}
-_CACHE_TTL = 300  # 5 minutes
+_CACHE_TTL = 900  # 15 minutes
+
+# Backoff tracker: {(brand, country): backoff_seconds}
+_BACKOFF: dict = {}
+
+# Multiple user agents to rotate
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+]
 
 def get_diag() -> dict:
     return dict(DIAG)
@@ -40,12 +52,13 @@ def decode_unicode(s: str) -> str:
         except:
             return s
 
-# Headers to mimic browser
-BROWSER_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-}
+# Headers to mimic browser (user agent rotates per request)
+def _random_headers() -> dict:
+    return {
+        "User-Agent": random.choice(USER_AGENTS),
+        "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
 
 async def scrape_via_requests(brand: str, country: str):
     """
@@ -56,7 +69,8 @@ async def scrape_via_requests(brand: str, country: str):
     results = []
     try:
         url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&is_targeted_country=false&media_type=all&q={brand}&search_type=keyword_unordered"
-        async with httpx.AsyncClient(timeout=20, headers=BROWSER_HEADERS, follow_redirects=True) as client:
+        headers = _random_headers()
+        async with httpx.AsyncClient(timeout=20, headers=headers, follow_redirects=True) as client:
             resp = await client.get(url)
             text = resp.text
             # Only return [] to let Playwright handle it
@@ -78,15 +92,33 @@ async def scrape_via_playwright(brand: str, country: str):
             DIAG.update({"stage": "cache_hit", "error": None, "ads": len(cached_results), "query": brand, "country": country})
             return cached_results
 
+    # Check backoff — if recently failed, wait before retrying
+    if cache_key in _BACKOFF:
+        backoff_until = _BACKOFF[cache_key]
+        if now < backoff_until:
+            wait_secs = int(backoff_until - now)
+            print(f"[Backoff] Waiting {wait_secs}s before retrying {brand} {country}")
+            DIAG.update({"stage": "backoff", "error": f"waiting {wait_secs}s", "query": brand, "country": country})
+            return []
+        else:
+            del _BACKOFF[cache_key]
+
     DIAG.update({"stage": "started", "error": None, "query": brand, "country": country})
     try:
         from playwright.async_api import async_playwright
         import json
+
+        # Random delay before launching (1-3 seconds)
+        pre_delay = random.uniform(1.0, 3.0)
+        print(f"[Delay] Waiting {pre_delay:.1f}s before launching browser for {brand} {country}")
+        await asyncio.sleep(pre_delay)
+
         url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&is_targeted_country=false&media_type=all&q={brand}&search_type=keyword_unordered"
         captured = {"list": [], "raw_payloads": [], "graphql_total": 0, "ad_library_hits": 0, "ad_lib_keys": [], "errors": []}
+        headers = _random_headers()
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"])
-            page = await browser.new_page(user_agent=BROWSER_HEADERS["User-Agent"])
+            page = await browser.new_page(user_agent=headers["User-Agent"])
             # اعتراض GraphQL
             async def handle_response(resp):
                 if "api/graphql" in resp.url:
@@ -270,16 +302,23 @@ async def scrape_via_playwright(brand: str, country: str):
                     import traceback; traceback.print_exc()
 
             else:
-                print(f"[GraphQL] No capture for {brand} {country} – returning []")
+                print(f"[GraphQL] No capture for {brand} {country} – setting backoff")
                 DIAG.update({"stage": "no_graphql_capture", "error": f"page_title={page_title[:100]}",
                              "graphql_total": captured["graphql_total"], "ad_library_hits": captured["ad_library_hits"],
                              "ad_lib_keys": captured["ad_lib_keys"], "gql_errors": captured["errors"],
                              "raw_payload_count": len(captured["raw_payloads"]),
                              "html_len": html_len, "query": brand, "country": country})
+                # Set exponential backoff: 60s, 120s, 240s (max 10 min)
+                prev_backoff = _BACKOFF.get(cache_key, 60)
+                new_backoff = min(prev_backoff * 2, 600)
+                _BACKOFF[cache_key] = datetime.utcnow().timestamp() + new_backoff
+                print(f"[Backoff] Set {new_backoff}s backoff for {brand} {country}")
     except Exception as e:
         print(f"[Playwright GraphQL] {country} failed: {e}")
         DIAG.update({"stage": "playwright_failed", "error": str(e)[:300], "query": brand, "country": country})
         import traceback; traceback.print_exc()
+        # Set backoff on failure too
+        _BACKOFF[cache_key] = datetime.utcnow().timestamp() + 120
     return []
 
 
@@ -464,7 +503,12 @@ async def scrape_meta_direct_v2(brand: str, countries: list[str]):
             return cached_results
 
     all_results = []
-    for country in countries:
+    for i, country in enumerate(countries):
+        # Random delay between countries (2-5 seconds) to avoid rate limiting
+        if i > 0:
+            delay = random.uniform(2.0, 5.0)
+            print(f"[Delay] Waiting {delay:.1f}s before scraping {country}")
+            await asyncio.sleep(delay)
         # 1. Requests (fast, no deps)
         req_res = await scrape_via_requests(brand, country)
         if req_res:
