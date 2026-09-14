@@ -68,7 +68,7 @@ async def scrape_via_playwright(brand: str, country: str):
         from playwright.async_api import async_playwright
         import json
         url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&is_targeted_country=false&media_type=all&q={brand}&search_type=keyword_unordered"
-        captured = {"list": [], "graphql_total": 0, "ad_library_hits": 0, "ad_lib_keys": [], "errors": []}
+        captured = {"list": [], "raw_payloads": [], "graphql_total": 0, "ad_library_hits": 0, "ad_lib_keys": [], "errors": []}
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"])
             page = await browser.new_page(user_agent=BROWSER_HEADERS["User-Agent"])
@@ -84,9 +84,14 @@ async def scrape_via_playwright(brand: str, country: str):
                                 dec = json.JSONDecoder()
                                 obj, _ = dec.raw_decode(body.lstrip())
                                 main = ((obj.get("data") or {}).get("ad_library_main")) or {}
-                                for k in list(main.keys())[:12]:
+                                # Capture ALL keys (not just 12)
+                                for k in list(main.keys()):
                                     if k not in captured["ad_lib_keys"]:
                                         captured["ad_lib_keys"].append(k)
+                                # Save full payload for debug (up to 3)
+                                if len(captured["raw_payloads"]) < 3:
+                                    captured["raw_payloads"].append(main)
+                                    print(f"[GraphQL] ad_library_main keys: {list(main.keys())}")
                                 errs = obj.get("errors")
                                 if errs and len(captured["errors"]) < 3:
                                     captured["errors"].append(str(errs)[:200])
@@ -128,6 +133,14 @@ async def scrape_via_playwright(brand: str, country: str):
                 html_len = len(await page.content())
             except: pass
             await browser.close()
+
+            # Save debug payloads to file
+            if captured["raw_payloads"]:
+                try:
+                    with open("/tmp/meta_gql_debug.json", "w") as f:
+                        json.dump(captured["raw_payloads"], f, ensure_ascii=False, indent=2, default=str)
+                    print(f"[GraphQL] Saved {len(captured['raw_payloads'])} payloads to /tmp/meta_gql_debug.json")
+                except: pass
 
             # إذا التقطنا GraphQL حقيقي، استخدمه
             if captured["list"]:
@@ -232,6 +245,7 @@ async def scrape_via_playwright(brand: str, country: str):
                 DIAG.update({"stage": "no_graphql_capture", "error": f"page_title={page_title[:100]}",
                              "graphql_total": captured["graphql_total"], "ad_library_hits": captured["ad_library_hits"],
                              "ad_lib_keys": captured["ad_lib_keys"], "gql_errors": captured["errors"],
+                             "raw_payload_count": len(captured["raw_payloads"]),
                              "html_len": html_len, "query": brand, "country": country})
     except Exception as e:
         print(f"[Playwright GraphQL] {country} failed: {e}")
