@@ -67,30 +67,34 @@ async def scrape_via_playwright(brand: str, country: str):
         from playwright.async_api import async_playwright
         import json
         url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&is_targeted_country=false&media_type=all&q={brand}&search_type=keyword_unordered"
-        captured = {"list": []}
+        captured = {"list": [], "graphql_total": 0, "ad_library_hits": 0}
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
+            browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"])
             page = await browser.new_page(user_agent=BROWSER_HEADERS["User-Agent"])
             # اعتراض GraphQL
             async def handle_response(resp):
                 if "api/graphql" in resp.url:
+                    captured["graphql_total"] += 1
                     try:
                         body = await resp.text()
-                        if "search_results_connection" in body and "ad_archive_id" in body:
+                        if "ad_library_main" in body:
+                            captured["ad_library_hits"] += 1
+                        if "search_results_connection" in body:
                             captured["list"].append(body)
                     except: pass
             page.on("response", handle_response)
             await page.goto(url, wait_until="domcontentloaded", timeout=30000)
             await page.wait_for_timeout(8000)
-            # Scroll to trigger GraphQL load
+            # Scroll several times to trigger GraphQL search load
             try:
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                await page.wait_for_timeout(4000)
+                for _ in range(4):
+                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    await page.wait_for_timeout(4000)
                 await page.evaluate("window.scrollTo(0, 0)")
                 await page.wait_for_timeout(2000)
             except: pass
-            # Wait for GraphQL to be captured (up to 10s)
-            for _ in range(20):
+            # Wait for GraphQL to be captured (up to 20s)
+            for _ in range(40):
                 if captured["list"]:
                     break
                 await page.wait_for_timeout(500)
@@ -201,7 +205,9 @@ async def scrape_via_playwright(brand: str, country: str):
 
             else:
                 print(f"[GraphQL] No capture for {brand} {country} – returning []")
-                DIAG.update({"stage": "no_graphql_capture", "error": f"page_title={page_title[:100]}", "query": brand, "country": country})
+                DIAG.update({"stage": "no_graphql_capture", "error": f"page_title={page_title[:100]}",
+                             "graphql_total": captured["graphql_total"], "ad_library_hits": captured["ad_library_hits"],
+                             "query": brand, "country": country})
     except Exception as e:
         print(f"[Playwright GraphQL] {country} failed: {e}")
         DIAG.update({"stage": "playwright_failed", "error": str(e)[:300], "query": brand, "country": country})
