@@ -93,7 +93,11 @@ export default function AdLibrary({ t, lang }: { t: any; lang: string }) {
     try {
       const data = await searchAds(q, countries, platform, true, pageName.trim() || undefined, activeOnly);
       setAds(data.ads || []);
-      setMsg(`✅ ${lang==="ar" ? "إعلانات حقيقية" : "Real ads"}: ${data.results_found} ${lang==="ar" ? "(محفوظ" : "(saved"} ${data.results_saved}) ${lang==="ar" ? "• الشغالة فقط" : "• active only"} • ${data.disclaimer}`);
+      if ((data.results_found || 0) === 0 && (data.scraper_note || data.api_error)) {
+        setMsg(`⚠️ ${lang==="ar" ? "لم يرجع فيسبوك إعلانات لهذا البحث الآن" : "Facebook returned no ads for this search right now"} — ${data.scraper_note || data.api_error}`);
+      } else {
+        setMsg(`✅ ${lang==="ar" ? "إعلانات حقيقية" : "Real ads"}: ${data.results_found} ${lang==="ar" ? "(محفوظ" : "(saved"} ${data.results_saved}) ${lang==="ar" ? "• الشغالة فقط" : "• active only"} • ${data.disclaimer}`);
+      }
       const s = await getStats(q).catch(()=>null);
       if(s) setStats(s);
     } catch(e:any){ setMsg(e.message); }

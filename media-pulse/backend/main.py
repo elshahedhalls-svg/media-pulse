@@ -227,6 +227,11 @@ async def search_ads(req: AdSearchRequest, db: Session = Depends(get_db), curren
             results = [r for r in results if r.get("status", "active") == "active"]
         saved = crud.save_ads(db, query, results)
         crud.update_job(db, job.id, status="completed", results_found=len(results), results_saved=saved, completed_at=datetime.utcnow())
+        scraper_note = None
+        if not results:
+            scraper_note = ("Facebook did not return ads for this search right now (API permission missing + automated "
+                            "search throttled from the server). Try again in a few minutes, or authorize the app at "
+                            "facebook.com/ads/library/api to enable the official API.")
         return {
             "job_id": job.id,
             "brand": req.brand_name,
@@ -236,6 +241,7 @@ async def search_ads(req: AdSearchRequest, db: Session = Depends(get_db), curren
             "results_found": len(results),
             "results_saved": saved,
             "api_error": api_error,
+            "scraper_note": scraper_note,
             "disclaimer": "Real Meta Ad Library ads (GraphQL). Spend/Impressions are ESTIMATED via CPM model. Not Meta official data.",
             "ads": results
         }
