@@ -98,6 +98,12 @@ export async function trackApp(data: { app_id: string; store: string; name: stri
   return r.json();
 }
 
+export async function trackAppByUrl(url: string, country: string = "EG") {
+  const r = await fetch(`${API}/api/apps/track-url?country=${country}`, { method: "POST", headers: headers(), body: JSON.stringify({ url }) });
+  if (!r.ok) throw new Error((await r.json()).detail || "Failed to add app by link");
+  return r.json();
+}
+
 export async function listTrackedApps(country?: string) {
   const q = country ? `?country=${country}` : "";
   const r = await fetch(`${API}/api/apps${q}`, { headers: headers() });
@@ -110,6 +116,9 @@ export async function getTrackedApp(trackedId: number) {
   if (!r.ok) throw new Error((await r.json()).detail || "Failed to load app");
   return r.json();
 }
+
+// Alias kept for readability at call sites that load full detail (snapshots included).
+export const getTrackedAppDetail = getTrackedApp;
 
 export async function refreshApp(trackedId: number, country: string = "EG") {
   const r = await fetch(`${API}/api/apps/${trackedId}/refresh?country=${country}`, { method: "POST", headers: headers() });
@@ -185,6 +194,37 @@ export async function getAttribution(trackedId: number, country?: string, model:
   params.set("window_days", String(windowDays));
   const q = `?${params.toString()}`;
   const r = await fetch(`${API}/api/correlation/${trackedId}/attribution${q}`, { headers: headers() });
+  return r.json();
+}
+
+// ==================== BRAND INTELLIGENCE (auth included) ====================
+export async function fetchBrandSentiment(brand: string, sources: string[], limit: number = 100, provider?: string) {
+  const params = new URLSearchParams({ sources: sources.join(","), limit: String(limit) });
+  if (provider) params.set("provider", provider);
+  const r = await fetch(`${API}/api/brand/${encodeURIComponent(brand)}/sentiment?${params}`, { headers: headers() });
+  if (!r.ok) throw new Error(`API error: ${r.status}`);
+  return r.json();
+}
+
+export async function fetchBrandMentions(brand: string, sources: string[], limit: number = 50, provider?: string) {
+  const params = new URLSearchParams({ sources: sources.join(","), limit: String(limit) });
+  if (provider) params.set("provider", provider);
+  const r = await fetch(`${API}/api/brand/${encodeURIComponent(brand)}/mentions?${params}`, { headers: headers() });
+  if (!r.ok) throw new Error(`API error: ${r.status}`);
+  return r.json();
+}
+
+export async function fetchBrandTrend(brand: string, days: number = 30, sources: string[] = []) {
+  const params = new URLSearchParams({ days: String(days) });
+  if (sources.length) params.set("sources", sources.join(","));
+  const r = await fetch(`${API}/api/brand/${encodeURIComponent(brand)}/trend?${params}`, { headers: headers() });
+  if (!r.ok) throw new Error(`API error: ${r.status}`);
+  return r.json();
+}
+
+export async function fetchBrandSources() {
+  const r = await fetch(`${API}/api/brand/sources`, { headers: headers() });
+  if (!r.ok) throw new Error(`API error: ${r.status}`);
   return r.json();
 }
 

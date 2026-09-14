@@ -44,29 +44,49 @@ async def search_apps(query: str, country: str = "EG", limit: int = 10) -> list[
     """البحث في Google Play Store — httpx"""
     try:
         import httpx
-        url = f"https://play.google.com/store/search?q={query}&c=apps&hl=en&gl={country}"
+        from urllib.parse import quote_plus
+        url = f"https://play.google.com/store/search?q={quote_plus(query)}&c=apps&hl=en&gl={country}"
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             r = await client.get(url, headers=BROWSER_HEADERS)
             content = r.text
 
-        # استخراج من HTML — لكل package، ابحث عن اسمه في الـ span اللي جوه الـ href
+        # استخراج الأسماء من النص بين العناصر HTML بدل spans
+        # النمط بعد كل package link: [0] الاسم، [1] المطور، [2] التقييم، ...
         results = []
         seen = set()
-        # استخراج الأزواج: (package_id, name) من النمط: href="...id=PKG...">...<span>NAME</span>
-        pairs = re.findall(r'/store/apps/details\?id=([a-zA-Z0-9._]+)[^>]*>.*?<span[^>]*>([^<]+)</span>', content, re.DOTALL)
-        for pkg, name in pairs:
+        rating_like = re.compile(r"^[\d\s.,★☆+()%\-–]+$|^[\d.]+$")
+        skip_words = {"in-app purchases", "contains ads", "in-app purchases with random items", "offers in-app purchases"}
+        packages = list(dict.fromkeys(re.findall(r'/store/apps/details\?id=([a-zA-Z0-9._]+)', content)))
+        for pkg in packages:
             if not pkg.startswith(("com.", "net.", "org.", "io.", "app.")):
                 continue
             if pkg in seen:
                 continue
+            idx = content.find(f'/store/apps/details?id={pkg}')
+            window = content[idx:idx+2000]
+            # استخراج كل النص بين العناصر >...<
+            all_text = re.findall(r'>([^<]{2,})<', window)
+            clean_texts = [t.strip() for t in all_text if t.strip() and not t.strip().startswith('{') and not t.strip().startswith('(')]
+            app_name = ""
+            for t in clean_texts:
+                t_lower = t.lower()
+                t = t.replace('&amp;', '&').replace('&#39;', "'").replace('&lt;', '<').replace('&gt;', '>').strip()
+                if len(t) < 3:
+                    continue
+                if rating_like.match(t):
+                    continue
+                if t_lower in skip_words or t_lower.startswith("rated for") or t_lower.startswith("offers in-app"):
+                    continue
+                if t in ("star", "Install", "Learn more"):
+                    continue
+                app_name = t
+                break
+            if not app_name:
+                app_name = pkg.split(".")[-1].replace(".", " ").title()
             seen.add(pkg)
-            # تنظيف HTML entities
-            clean_name = name.replace('&amp;', '&').replace('&#39;', "'").replace('&lt;', '<').replace('&gt;', '>').strip()
-            if len(clean_name) < 2:
-                clean_name = pkg.split(".")[-1].replace(".", " ").title()
             results.append({
                 "app_id": pkg,
-                "name": clean_name,
+                "name": app_name,
                 "developer": "",
                 "store": "play",
                 "icon_url": None,
@@ -74,22 +94,6 @@ async def search_apps(query: str, country: str = "EG", limit: int = 10) -> list[
             })
             if len(results) >= limit:
                 break
-        # Fallback: لو مفيش نتائج، استخرج من URLs بس
-        if not results:
-            packages = list(dict.fromkeys(re.findall(r'/store/apps/details\?id=([a-zA-Z0-9._]+)', content)))
-            for pkg in packages[:limit]:
-                if pkg.startswith(("com.", "net.", "org.", "io.", "app.")) and pkg not in seen:
-                    seen.add(pkg)
-                    results.append({
-                        "app_id": pkg,
-                        "name": pkg.split(".")[-1].replace(".", " ").title(),
-                        "developer": "",
-                        "store": "play",
-                        "icon_url": None,
-                        "url": f"https://play.google.com/store/apps/details?id={pkg}&gl={country}",
-                    })
-                    if len(results) >= limit:
-                        break
         print(f"[PlayStore Search] {query}: {len(results)} results")
         return results
     except Exception as e:

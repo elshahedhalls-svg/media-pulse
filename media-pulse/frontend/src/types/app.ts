@@ -1,3 +1,39 @@
+export interface AppSnapshotSummary {
+  installs_exact?: number;
+  downloads_est?: number;
+  installs_display?: string;
+  rating_avg?: number;
+  rating_count?: number;
+  daily_downloads?: number;
+  new_ratings?: number;
+  downloads_est_low?: number;
+  downloads_est_high?: number;
+  version?: string;
+  date?: string;
+  country?: string;
+}
+
+export interface TrackedListItem {
+  id: number;
+  app_id: string;
+  name: string;
+  store: string;
+  icon_url?: string;
+  url?: string;
+  category?: string;
+  latest_snapshot?: AppSnapshotSummary;
+}
+
+export interface AppSearchResult {
+  app_id: string;
+  name: string;
+  store: string;
+  developer?: string;
+  icon_url?: string;
+  url?: string;
+  category?: string;
+}
+
 export interface TrackedApp {
   id: number;
   tracked_id: number;

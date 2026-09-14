@@ -386,6 +386,61 @@ async def search_apps(query: str, store: str = "all", country: str = "EG",
         results.extend(itunes_results)
     return {"query": query, "country": country, "results": results, "count": len(results)}
 
+def parse_app_link(url: str):
+    """Parse a direct app link (or bare package/id) → (store, app_id) or None.
+    Play: https://play.google.com/store/apps/details?id=com.xxx
+    AppStore: https://apps.apple.com/.../app/.../id123456789
+    Also accepts bare 'com.xxx.yyy' (play) or bare digits (appstore id)."""
+    import re
+    url = (url or "").strip()
+    if not url:
+        return None
+    if url.isdigit():
+        return ("appstore", url)
+    if re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+", url):
+        return ("play", url)
+    m = re.search(r"[?&]id=([a-zA-Z0-9._]+)", url)
+    if "play.google.com" in url and m:
+        return ("play", m.group(1))
+    m = re.search(r"/id(\d+)", url)
+    if ("apps.apple.com" in url or "itunes.apple.com" in url) and m:
+        return ("appstore", m.group(1))
+    return None
+
+@app.post("/api/apps/track-url")
+async def track_app_by_url(data: dict, country: str = "EG", db: Session = Depends(get_db), current: User = Depends(get_current_user)):
+    """إضافة تطبيق بلينك مباشر (Play/AppStore) — parse + details + snapshot"""
+    url = (data.get("url") or "").strip()
+    parsed = parse_app_link(url)
+    if not parsed:
+        raise HTTPException(status_code=400, detail="Unrecognized app link. Paste a Google Play or App Store link.")
+    store, app_id = parsed
+    try:
+        if store == "play":
+            from services.playstore import get_app_details
+            app_data = await get_app_details(app_id, country)
+        else:
+            from services.itunes import get_itunes_details
+            app_data = await get_itunes_details(app_id, country)
+    except Exception as e:
+        print(f"[TrackURL] details failed for {url}: {e}")
+        app_data = None
+    if not app_data:
+        raise HTTPException(status_code=502, detail="Could not fetch app data from this link. Check the link and country.")
+    app = crud.get_or_create_app(db, app_id=app_data.get("app_id", app_id),
+                                 name=app_data.get("name", app_id), store=store,
+                                 icon_url=app_data.get("icon_url"), url=app_data.get("url"),
+                                 category=app_data.get("category"), developer=app_data.get("developer"))
+    snap = crud.save_app_snapshot(db, app.id, app_data, country)
+    return {
+        "message": "Tracked",
+        "app_id": app.id,
+        "name": app.name,
+        "store": store,
+        "snapshot_id": snap.id if snap else None,
+        "has_data": snap is not None,
+    }
+
 @app.post("/api/apps/track")
 async def track_app(data: dict, db: Session = Depends(get_db), current: User = Depends(get_current_user)):
     """إضافة تطبيق للمتابعة + جلب البيانات تلقائي"""
@@ -485,6 +540,9 @@ async def get_app(tracked_id: int, db: Session = Depends(get_db),
             "reviews_count": latest.reviews_count if latest else None,
             "daily_downloads": latest.daily_downloads if latest else None,
             "daily_growth_pct": latest.daily_growth_pct if latest else None,
+            "new_ratings": latest.new_ratings if latest else None,
+            "downloads_est_low": latest.downloads_est_low if latest else None,
+            "downloads_est_high": latest.downloads_est_high if latest else None,
             "star_distribution": latest.star_distribution if latest else None,
             "version": latest.version if latest else None,
             "last_updated": latest.last_updated if latest else None,
@@ -501,6 +559,9 @@ async def get_app(tracked_id: int, db: Session = Depends(get_db),
             "reviews_count": s.reviews_count,
             "daily_downloads": s.daily_downloads,
             "daily_growth_pct": s.daily_growth_pct,
+            "new_ratings": s.new_ratings,
+            "downloads_est_low": s.downloads_est_low,
+            "downloads_est_high": s.downloads_est_high,
             "star_distribution": s.star_distribution,
             "country": s.country_code,
         } for s in snapshots]

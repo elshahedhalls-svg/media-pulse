@@ -144,6 +144,9 @@ class AppSnapshot(Base):
     # Growth metrics (computed)
     daily_downloads = Column(Integer, nullable=True)      # installs[today] - installs[yesterday]
     daily_growth_pct = Column(Float, nullable=True)       # (daily_downloads / yesterday) * 100
+    new_ratings = Column(Integer, nullable=True)          # rating_count[today] - rating_count[prev] (same country)
+    downloads_est_low = Column(Integer, nullable=True)    # lifetime estimate low (appstore: rating_count * 20)
+    downloads_est_high = Column(Integer, nullable=True)   # lifetime estimate high (appstore: rating_count * 50)
     
     # App metadata
     version = Column(String(50), nullable=True)

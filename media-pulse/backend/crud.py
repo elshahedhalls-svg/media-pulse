@@ -220,10 +220,22 @@ def get_tracked_apps(db: Session, country: str = None) -> list:
             "created_at": app.created_at.isoformat() if app.created_at else None,
             "latest_snapshot": {
                 "downloads_est": latest.downloads_est,
+                "installs_exact": latest.installs_exact,
+                "installs_display": latest.installs_display,
+                "installs_bucket_min": latest.installs_bucket_min,
                 "rating_avg": latest.rating_avg,
                 "rating_count": latest.rating_count,
                 "reviews_count": latest.reviews_count,
-                "version": latest.raw_data.get("version") if latest and latest.raw_data else None,
+                "daily_downloads": latest.daily_downloads,
+                "daily_growth_pct": latest.daily_growth_pct,
+                "new_ratings": latest.new_ratings,
+                "downloads_est_low": latest.downloads_est_low,
+                "downloads_est_high": latest.downloads_est_high,
+                "star_distribution": latest.star_distribution,
+                "developer": latest.developer,
+                "category": latest.category,
+                "version": latest.version or (latest.raw_data.get("version") if latest and latest.raw_data else None),
+                "last_updated": latest.last_updated,
                 "country": latest.country_code,
                 "date": latest.date.isoformat() if latest and latest.date else None,
             } if latest else None,
@@ -256,7 +268,30 @@ def save_app_snapshot(db: Session, app_tracked_id: int, data: dict, country: str
     # reviews_count = عدد المراجعات الفعلية إن وجد، وإلا rating_count (إجمالي التقييمات)
     fetched_reviews = len(data.get("reviews", []))
     total_reviews = data.get("rating_count") or 0
-    
+
+    # سرعة التقييمات + نطاق تقدير التحميلات (لـ App Store — آبل لا تنشر التحميلات)
+    # نسبة التقييم/تحميل المتعارف عليها 2-5% → مضاعف 20x..50x
+    new_ratings = None
+    downloads_est_low = None
+    downloads_est_high = None
+    try:
+        parent_store = db.query(AppTracked).filter(AppTracked.id == app_tracked_id).first()
+        is_appstore = parent_store is not None and parent_store.store == "appstore"
+    except Exception:
+        is_appstore = False
+    if is_appstore and total_reviews:
+        downloads_est_low = int(total_reviews * 20)
+        downloads_est_high = int(total_reviews * 50)
+        prev_same_country = (
+            db.query(AppSnapshot)
+            .filter(AppSnapshot.app_id == app_tracked_id, AppSnapshot.country_code == country)
+            .order_by(AppSnapshot.date.desc())
+            .first()
+        )
+        if prev_same_country and prev_same_country.rating_count is not None:
+            delta = total_reviews - prev_same_country.rating_count
+            new_ratings = delta if delta >= 0 else None
+
     snap = AppSnapshot(
         app_id=app_tracked_id,
         downloads_est=installs_exact,  # backwards compat
@@ -269,6 +304,9 @@ def save_app_snapshot(db: Session, app_tracked_id: int, data: dict, country: str
         star_distribution=data.get("star_distribution"),
         daily_downloads=daily_downloads,
         daily_growth_pct=daily_growth_pct,
+        new_ratings=new_ratings,
+        downloads_est_low=downloads_est_low,
+        downloads_est_high=downloads_est_high,
         version=data.get("version"),
         last_updated=data.get("last_updated"),
         developer=data.get("developer"),
@@ -282,6 +320,26 @@ def save_app_snapshot(db: Session, app_tracked_id: int, data: dict, country: str
     db.add(snap)
     db.commit()
     db.refresh(snap)
+    # Backfill parent app metadata from fresh details (search results carry
+    # no icon for Play, so without this the icon stays NULL forever).
+    try:
+        parent = db.query(AppTracked).filter(AppTracked.id == app_tracked_id).first()
+        if parent:
+            changed = False
+            if not parent.icon_url and data.get("icon_url"):
+                parent.icon_url = data["icon_url"]
+                changed = True
+            if not parent.url and data.get("url"):
+                parent.url = data["url"]
+                changed = True
+            if not parent.category and data.get("category"):
+                parent.category = data["category"]
+                changed = True
+            if changed:
+                db.commit()
+                db.refresh(parent)
+    except Exception as e:
+        print(f"[Snapshot] parent backfill failed for {app_tracked_id}: {e}")
     return snap
 
 def get_app_snapshots(db: Session, app_tracked_id: int, country: str = None, limit: int = 50) -> list:

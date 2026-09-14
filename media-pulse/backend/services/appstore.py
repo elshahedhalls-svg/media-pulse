@@ -119,20 +119,15 @@ async def get_app_details(app_id: str, country: str = "EG") -> Optional[dict]:
             print(f"[AppStore] {app_id}: not found")
             return None
         r = results[0]
-        # حساب التقييم التقديري من AverageUserRating + ratingCountTotal
         rating_avg = r.get("averageUserRating")
         rating_count = r.get("userRatingCount", 0)
-        
-        # تقدير عدد التحميلات من عدد التقييمات (Apple لا يوفر التحميلات مباشرة)
-        # نسبة التقييمات إلى التحميلات عادة 1-5%
-        estimated_downloads = int(rating_count * 20) if rating_count else 0
+
         installs = {
-            "min": estimated_downloads,
-            "max": estimated_downloads * 3,
-            "label": f"~{_format_downloads(estimated_downloads)} (est.)",
+            "min": rating_count,
+            "max": rating_count,
+            "label": f"{_format_downloads(rating_count)} ratings",
         }
-        
-        # ملاحظة: Apple لا يوفر عدد التحميلات — نستخدم تقدير من التقييمات
+
         return {
             "app_id": str(app_id),
             "name": r.get("trackName", ""),
@@ -142,6 +137,9 @@ async def get_app_details(app_id: str, country: str = "EG") -> Optional[dict]:
             "rating_avg": round(rating_avg, 1) if rating_avg else None,
             "rating_count": rating_count,
             "installs": installs,
+            "installs_exact": rating_count,
+            "installs_display": f"{_format_downloads(rating_count)} ratings",
+            "installs_bucket_min": rating_count,
             "version": r.get("version", ""),
             "last_updated": r.get("currentVersionReleaseDate", ""),
             "icon_url": r.get("artworkUrl100", ""),

@@ -62,6 +62,7 @@ async def get_itunes_details(app_id: str, country: str = "EG") -> Optional[dict]
         return None
 
     item = results[0]
+    rating_count = item.get("userRatingCount", 0)
     return {
         "app_id": str(item.get("trackId", "")),
         "name": item.get("trackName", ""),
@@ -71,11 +72,21 @@ async def get_itunes_details(app_id: str, country: str = "EG") -> Optional[dict]
         "category": item.get("primaryGenreName", ""),
         "developer": item.get("artistName", ""),
         "rating_avg": item.get("averageUserRating"),
-        "rating_count": item.get("userRatingCount"),
+        "rating_count": rating_count,
         "version": item.get("version", ""),
         "size_bytes": item.get("fileSizeBytes"),
         "price": item.get("formattedPrice", "Free"),
-        "description": item.get("description", ""),
+        "description": (item.get("description") or "")[:1500],
         "release_date": item.get("releaseDate"),
         "current_version_release_date": item.get("currentVersionReleaseDate"),
+        "installs": {
+            "min": rating_count,
+            "max": rating_count,
+            "label": f"{rating_count} ratings",
+        },
+        "installs_exact": rating_count,
+        "installs_display": f"{rating_count} ratings",
+        "installs_bucket_min": rating_count,
+        "star_distribution": [0, 0, 0, 0, 0],
+        "last_updated": item.get("currentVersionReleaseDate", ""),
     }
