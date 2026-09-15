@@ -72,9 +72,19 @@ def health():
             pw_status["chromium"] = bool(p.chromium.executable_path)
     except Exception as e:
         pw_status["error"] = str(e)[:120]
+    # Test Chrome (for Selenium scraper)
+    chrome_status = {"installed": False, "path": None}
+    try:
+        import subprocess
+        result = subprocess.run(["which", "google-chrome"], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            chrome_status["installed"] = True
+            chrome_status["path"] = result.stdout.strip()
+    except Exception:
+        pass
     return {"status":"ok", "service":"media-pulse", "meta_token_valid": test_token_valid(),
             "commit": os.getenv("RAILWAY_GIT_COMMIT_SHA", "local")[:8],
-            "playwright": pw_status, "time": datetime.utcnow().isoformat()}
+            "playwright": pw_status, "chrome": chrome_status, "time": datetime.utcnow().isoformat()}
 
 @app.get("/api/supabase-config")
 def supabase_config():
