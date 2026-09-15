@@ -12,28 +12,6 @@ from datetime import datetime, timedelta
 import random
 from services.estimation import estimate_budget_and_impressions, USD_TO_EGP
 
-# Load proxy config from environment
-PROXY_HOST = os.getenv("PROXY_HOST", "")
-PROXY_PORT = os.getenv("PROXY_PORT", "")
-PROXY_USERNAME = os.getenv("PROXY_USERNAME", "")
-PROXY_PASSWORD = os.getenv("PROXY_PASSWORD", "")
-
-def _get_proxy_config() -> dict | None:
-    """Get Playwright proxy config if proxy is configured."""
-    if PROXY_HOST and PROXY_PORT and PROXY_USERNAME and PROXY_PASSWORD:
-        return {
-            "server": f"http://{PROXY_HOST}:{PROXY_PORT}",
-            "username": PROXY_USERNAME,
-            "password": PROXY_PASSWORD,
-        }
-    return None
-
-def _get_proxy_url() -> str | None:
-    """Get httpx proxy URL if proxy is configured."""
-    if PROXY_HOST and PROXY_PORT and PROXY_USERNAME and PROXY_PASSWORD:
-        return f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@{PROXY_HOST}:{PROXY_PORT}"
-    return None
-
 # Last-run diagnostics (surfaced via /api/ads/preview debug field)
 DIAG: dict = {"stage": "never_run", "error": None}
 
@@ -93,8 +71,7 @@ async def scrape_via_requests(brand: str, country: str):
     try:
         url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&is_targeted_country=false&media_type=all&q={brand}&search_type=keyword_unordered"
         headers = _random_headers()
-        proxy_url = _get_proxy_url()
-        async with httpx.AsyncClient(timeout=20, headers=headers, proxy=proxy_url, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=20, headers=headers, follow_redirects=True) as client:
             resp = await client.get(url)
             text = resp.text
             # Only return [] to let Playwright handle it
@@ -140,10 +117,9 @@ async def scrape_via_playwright(brand: str, country: str):
         url = f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={country}&is_targeted_country=false&media_type=all&q={brand}&search_type=keyword_unordered"
         captured = {"list": [], "raw_payloads": [], "graphql_total": 0, "ad_library_hits": 0, "ad_lib_keys": [], "errors": []}
         headers = _random_headers()
-        proxy_config = _get_proxy_config()
         async with async_playwright() as p:
             launch_args = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"]
-            browser = await p.chromium.launch(headless=True, proxy=proxy_config, args=launch_args)
+            browser = await p.chromium.launch(headless=True, args=launch_args)
             page = await browser.new_page(user_agent=headers["User-Agent"])
             # اعتراض GraphQL
             async def handle_response(resp):
