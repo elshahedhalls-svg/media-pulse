@@ -149,8 +149,8 @@ async def preview_ads(req: AdSearchRequest, db: Session = Depends(get_db), curre
     # Try Selenium first, then Playwright
     results = []
     try:
-        results = await scrape_meta_selenium(query, [country])
-    except Exception as e:
+        results = await asyncio.wait_for(scrape_meta_selenium(query, [country]), timeout=60)
+    except (asyncio.TimeoutError, Exception) as e:
         print(f"Selenium preview failed: {e}")
     if not results:
         results = await scrape_meta_direct_v2(query, [country])
@@ -206,9 +206,12 @@ async def search_ads(req: AdSearchRequest, db: Session = Depends(get_db), curren
         api_error = None
         # 1. Selenium (undetected-chromedriver) — bypasses bot detection
         try:
-            results = await scrape_meta_selenium(query, req.countries)
+            results = await asyncio.wait_for(scrape_meta_selenium(query, req.countries), timeout=60)
             if results:
                 print(f"[Selenium] Found {len(results)} ads for {query}")
+        except asyncio.TimeoutError:
+            print("[Selenium] Overall timeout")
+            results = []
         except Exception as e1:
             print(f"Selenium scraper failed: {e1}")
             results = []

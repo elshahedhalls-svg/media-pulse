@@ -128,8 +128,8 @@ async def scrape_via_selenium(brand: str, country: str) -> list:
         config = ScraperConfig(
             url=url,
             output_dir=output_dir,
-            max_scrolls=10,
-            scroll_pause=3.0,
+            max_scrolls=5,
+            scroll_pause=2.0,
             snapshot_every=5,
             headless=True,
             store_html=False,
@@ -138,9 +138,16 @@ async def scrape_via_selenium(brand: str, country: str) -> list:
         )
 
         print(f"[Selenium] Scraping {brand} {country}...")
-        # Run scrape in executor to avoid blocking
+        # Run scrape in executor with timeout
         loop = asyncio.get_event_loop()
-        raw_ads = await loop.run_in_executor(None, scrape, config)
+        try:
+            raw_ads = await asyncio.wait_for(
+                loop.run_in_executor(None, scrape, config),
+                timeout=45
+            )
+        except asyncio.TimeoutError:
+            print(f"[Selenium] Timed out for {brand} {country}")
+            return []
 
         if not raw_ads:
             print(f"[Selenium] No ads found for {brand} {country}")
