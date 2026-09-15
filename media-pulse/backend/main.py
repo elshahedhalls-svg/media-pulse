@@ -76,12 +76,23 @@ def health():
     chrome_status = {"installed": False, "path": None}
     try:
         import subprocess
+        # Check system Chrome
         result = subprocess.run(["which", "google-chrome"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             chrome_status["installed"] = True
             chrome_status["path"] = result.stdout.strip()
-    except Exception:
-        pass
+        else:
+            # Check Playwright's Chrome
+            result2 = subprocess.run(["python3", "-m", "playwright", "install", "--dry-run", "chrome"],
+                                     capture_output=True, text=True, timeout=10)
+            # Look for Chrome in Playwright's cache
+            import glob
+            pw_chrome = glob.glob(os.path.expanduser("~/.cache/ms-playwright/chrome-*/chrome-linux/chrome"))
+            if pw_chrome:
+                chrome_status["installed"] = True
+                chrome_status["path"] = pw_chrome[0]
+    except Exception as e:
+        chrome_status["error"] = str(e)[:100]
     return {"status":"ok", "service":"media-pulse", "meta_token_valid": test_token_valid(),
             "commit": os.getenv("RAILWAY_GIT_COMMIT_SHA", "local")[:8],
             "playwright": pw_status, "chrome": chrome_status, "time": datetime.utcnow().isoformat()}
