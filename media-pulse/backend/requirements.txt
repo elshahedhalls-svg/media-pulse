@@ -22,3 +22,6 @@ deep-translator==1.11.4
 nrclex==3.0.0
 ddgs>=9.0.0
 google-play-scraper==1.2.4
+facebook-ad-library-scraper==0.1.1
+undetected-chromedriver==3.5.5
+selenium==4.49.0

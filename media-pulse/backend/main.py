@@ -19,6 +19,7 @@ from services.auth import verify_password, create_token, decode_token, hash_pass
 from services.meta_api import search_meta_ads_api, test_token_valid
 from services.meta_scraper import scrape_meta_direct
 from services.meta_scraper_v2 import scrape_meta_direct_v2
+from services.meta_scraper_v3 import scrape_meta_selenium
 from services.keyword_generator import generate_keywords, suggest_custom_keywords
 from services.correlation import pearson_correlation, spearman_correlation, detect_lag, compute_roi, compute_attribution_simple, align_daily_series
 from services.tiktok import search_tiktok_ads, get_trending_hashtags, get_trending_videos, get_ad_analytics, get_industries, get_supported_countries
@@ -145,7 +146,14 @@ async def preview_ads(req: AdSearchRequest, db: Session = Depends(get_db), curre
     query = req.page_name.strip() if req.page_name and req.page_name.strip() else req.brand_name
     # المعاينة على أول دولة مختارة (أسرع) – البحث الكامل يشمل كل الدول
     country = req.countries[0] if req.countries else "EG"
-    results = await scrape_meta_direct_v2(query, [country])
+    # Try Selenium first, then Playwright
+    results = []
+    try:
+        results = await scrape_meta_selenium(query, [country])
+    except Exception as e:
+        print(f"Selenium preview failed: {e}")
+    if not results:
+        results = await scrape_meta_direct_v2(query, [country])
     if req.page_name and req.page_name.strip():
         pn_lower = req.page_name.strip().lower()
         results = [r for r in results if pn_lower in (r.get("page_name") or "").lower()]
@@ -196,19 +204,22 @@ async def search_ads(req: AdSearchRequest, db: Session = Depends(get_db), curren
     try:
         results = []
         api_error = None
-        # Scraper FIRST (Playwright GraphQL + DOM fallback) — faster, no permission needed
+        # 1. Selenium (undetected-chromedriver) — bypasses bot detection
         try:
-            results = await scrape_meta_direct_v2(query, req.countries)
-            # If page_name filter requested, filter results to matching page
-            if req.page_name and req.page_name.strip():
-                pn_lower = req.page_name.strip().lower()
-                filtered = [r for r in results if pn_lower in (r.get("page_name") or "").lower()]
-                if filtered:
-                    results = filtered
-        except Exception as e2:
-            print(f"V2 scraper failed: {e2}")
+            results = await scrape_meta_selenium(query, req.countries)
+            if results:
+                print(f"[Selenium] Found {len(results)} ads for {query}")
+        except Exception as e1:
+            print(f"Selenium scraper failed: {e1}")
             results = []
-        # Fallback to Meta API if scraper returned nothing
+        # 2. Playwright GraphQL + DOM fallback
+        if not results:
+            try:
+                results = await scrape_meta_direct_v2(query, req.countries)
+            except Exception as e2:
+                print(f"V2 scraper failed: {e2}")
+                results = []
+        # 3. Meta API fallback
         if not results and req.use_api and test_token_valid():
             try:
                 results = await search_meta_ads_api(query, req.countries)
@@ -219,6 +230,12 @@ async def search_ads(req: AdSearchRequest, db: Session = Depends(get_db), curren
                 api_error = str(e)
                 print(f"API failed: {e}")
                 results = []
+        # If page_name filter requested, filter results to matching page
+        if req.page_name and req.page_name.strip():
+            pn_lower = req.page_name.strip().lower()
+            filtered = [r for r in results if pn_lower in (r.get("page_name") or "").lower()]
+            if filtered:
+                results = filtered
         # إعلانات حقيقية فقط (بدون Demo/Mock نهائياً)
         results = [r for r in results if str(r.get("ad_archive_id", "")).isdigit()]
         # الإعلانات الشغالة فعلياً فقط (افتراضياً)
